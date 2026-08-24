@@ -1,0 +1,32 @@
+# Normalize line endings across Windows / macOS / Linux.
+# Everything is stored as LF in the repository; Git converts on checkout.
+# Keep this file ASCII-only.
+
+* text=auto eol=lf
+
+# Files that MUST stay LF: they are executed inside Linux containers (Sprint 7
+# Docker) or by CI. A CRLF here fails with a confusing "bad interpreter" error.
+*.sh        text eol=lf
+*.py        text eol=lf
+*.sql       text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+Dockerfile  text eol=lf
+*.env*      text eol=lf
+
+# Windows-only scripts must stay CRLF.
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# Binary files: never touch, never diff.
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.ico       binary
+*.pdf       binary
+*.woff      binary
+*.woff2     binary
+*.db        binary
+*.sqlite3   binary
