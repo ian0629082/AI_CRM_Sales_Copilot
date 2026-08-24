@@ -7,15 +7,20 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user
 from app.db.database import get_db
+from app.models.user import User
 from app.schemas.interaction import InteractionCreate, InteractionRead
 from app.services.interaction_service import InteractionService
 
 router = APIRouter(prefix="/leads/{lead_id}/interactions", tags=["interactions"])
 
 
-def get_interaction_service(db: Session = Depends(get_db)) -> InteractionService:
-    return InteractionService(db)
+def get_interaction_service(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> InteractionService:
+    return InteractionService(db, current_user)
 
 
 @router.post("", response_model=InteractionRead, status_code=status.HTTP_201_CREATED)

@@ -4,7 +4,12 @@
 這樣做的理由：日後要換資料庫、換 LLM 供應商，只要改這一個檔案。
 """
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# JWT 密鑰的最低長度。太短的密鑰可以被暴力破解，
+# 一旦被破解，攻擊者就能自行簽發任何使用者的 token。
+MIN_JWT_SECRET_LENGTH = 32
 
 
 class Settings(BaseSettings):
@@ -19,12 +24,26 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str
 
-    JWT_SECRET: str = "change-me"
+    JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 
     # Sprint 3 才會用到
     OPENAI_API_KEY: str = ""
+
+    @field_validator("JWT_SECRET")
+    @classmethod
+    def jwt_secret_must_be_strong(cls, v: str) -> str:
+        """啟動時就擋掉弱密鑰，而不是等到上線被攻擊才發現。
+
+        產生方式：python -c "import secrets; print(secrets.token_urlsafe(32))"
+        """
+        if len(v) < MIN_JWT_SECRET_LENGTH:
+            raise ValueError(
+                f"JWT_SECRET 長度至少需 {MIN_JWT_SECRET_LENGTH} 字元，"
+                "請用 secrets.token_urlsafe(32) 產生"
+            )
+        return v
 
 
 settings = Settings()
