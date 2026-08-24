@@ -13,7 +13,7 @@ AI 驅動的房仲業務 CRM 助手：把客戶的自然語言需求轉成結構
 | 1 | CRM Core：Interaction CRUD + Lead Detail Timeline | ✅ |
 | 1 | CRM Core：Alembic migration | ✅ |
 | 1 | CRM Core：Authentication（JWT + bcrypt）與資料隔離 | ✅ |
-| 2 | Vertical Slice + Next.js Frontend | ⬜ |
+| 2 | Vertical Slice：Next.js 前端（登入、客戶列表、新增、詳細頁） | ✅ |
 | 3 | AI Requirement Parsing | ⬜ |
 | 4 | AI Evaluation Dataset | ⬜ |
 | 5 | Lead Scoring + Follow-up | ⬜ |
@@ -24,7 +24,8 @@ AI 驅動的房仲業務 CRM 助手：把客戶的自然語言需求轉成結構
 
 - **Backend**：Python 3.12 + FastAPI + SQLAlchemy 2.0
 - **Database**：PostgreSQL 18（Neon, AWS ap-southeast-1 新加坡）
-- **Frontend**：Next.js + TypeScript（Sprint 2）
+- **Frontend**：Next.js 16 + React 19 + TypeScript + Tailwind v4 + shadcn/ui
+- **前端資料層**：TanStack Query（快取與重新驗證）+ react-hook-form + zod
 - **Auth**：JWT（PyJWT）+ bcrypt 密碼雜湊
 - **AI**：LLM Structured Output + Pydantic 驗證（Sprint 3）
 
@@ -47,6 +48,42 @@ uvicorn app.main:app --reload
 ```
 
 啟動後開 <http://127.0.0.1:8000/docs> 看互動式 API 文件。
+
+## 前端啟動方式
+
+```bash
+cd frontend
+
+# 第一次執行才需要
+npm install
+copy .env.example .env.local    # 預設值即可對應本機後端
+
+npm run dev
+```
+
+開 <http://localhost:3000>。後端必須同時執行，否則登入會失敗。
+
+### 前後端型別同步
+
+後端的 OpenAPI schema 會生成前端的 TypeScript 型別。**改完後端的 schema 後要重跑**：
+
+```bash
+cd backend
+python -m scripts.export_openapi     # 產生 frontend/openapi.json
+
+cd ../frontend
+npm run gen:api                      # 由 openapi.json 生成 src/types/api.ts
+```
+
+前端所有 API 型別都來自 `src/types/api.ts`，不要手寫。後端改了欄位，前端 `npm run build` 就會編譯失敗 —— 這正是我們要的效果，而不是等到 Demo 時才發現畫面空白。
+
+### 認證方式與其取捨
+
+JWT 存在 `localStorage`，以 `Authorization: Bearer` 標頭送出。
+
+沒有採用 httpOnly cookie 的原因：前端部署在 Vercel、後端在 Render，兩者屬於不同網域。跨網域 cookie 需要 `SameSite=None`，而現代瀏覽器的第三方 cookie 限制會直接擋掉它。
+
+代價是 `localStorage` 可被 XSS 讀取。正式產品的作法會是把前端與 API 收在同一網域下（BFF 或反向代理），再改用 httpOnly cookie。
 
 ## 資料庫 Migration
 
