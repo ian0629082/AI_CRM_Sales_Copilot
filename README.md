@@ -12,7 +12,7 @@ AI 驅動的房仲業務 CRM 助手：把客戶的自然語言需求轉成結構
 | 1 | CRM Core：Lead CRUD + Neon PostgreSQL 連線 | ✅ |
 | 1 | CRM Core：Interaction CRUD + Lead Detail Timeline | ✅ |
 | 1 | CRM Core：Alembic migration | ✅ |
-| 1 | CRM Core：Authentication（JWT + bcrypt） | ⬜ |
+| 1 | CRM Core：Authentication（JWT + bcrypt）與資料隔離 | ✅ |
 | 2 | Vertical Slice + Next.js Frontend | ⬜ |
 | 3 | AI Requirement Parsing | ⬜ |
 | 4 | AI Evaluation Dataset | ⬜ |
@@ -25,6 +25,7 @@ AI 驅動的房仲業務 CRM 助手：把客戶的自然語言需求轉成結構
 - **Backend**：Python 3.12 + FastAPI + SQLAlchemy 2.0
 - **Database**：PostgreSQL 18（Neon, AWS ap-southeast-1 新加坡）
 - **Frontend**：Next.js + TypeScript（Sprint 2）
+- **Auth**：JWT（PyJWT）+ bcrypt 密碼雜湊
 - **AI**：LLM Structured Output + Pydantic 驗證（Sprint 3）
 
 ## 後端啟動方式
@@ -100,6 +101,14 @@ backend/
 
 Base path：`/api/v1`
 
+認證（除 `/auth/register`、`/auth/login`、`/health` 外，所有 API 都需要 `Authorization: Bearer <token>`）：
+
+| Method | Path | 說明 |
+|---|---|---|
+| POST | `/auth/register` | 註冊業務帳號 |
+| POST | `/auth/login` | 登入並取得 access token |
+| GET | `/auth/me` | 取得目前登入者，可用於確認 token 是否有效 |
+
 | Method | Path | 說明 |
 |---|---|---|
 | POST | `/leads` | 建立 Lead |
@@ -124,4 +133,13 @@ Base path：`/api/v1`
 - 新增互動紀錄時，若 Lead 仍是 `NEW`，自動推進為 `CONTACTED`
 - 但已進展到後續狀態（如 `NEGOTIATING`）的 Lead 不會被退回
 - 刪除 Lead 會連帶刪除其所有互動紀錄（cascade）
+
+### 安全性
+
+- 密碼以 bcrypt 雜湊儲存，明文不留存、不出現在任何 API 回應
+- 每位業務只看得到自己的客戶，`owner_id` 條件直接寫在 SQL 層
+- 存取他人資料一律回 `404` 而非 `403`：回 403 等於承認該 id 存在，
+  攻擊者可藉此列舉出系統內的客戶數量
+- 登入失敗時，「帳號不存在」與「密碼錯誤」回傳相同訊息，避免帳號枚舉
+- `JWT_SECRET` 少於 32 字元時，程式啟動就會直接失敗
 

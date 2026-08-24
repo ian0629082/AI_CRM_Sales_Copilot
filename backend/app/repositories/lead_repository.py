@@ -1,7 +1,7 @@
 """Repository：只負責跟資料庫講話，不做任何商業判斷。
 
-好處是 Sprint 6 寫測試時，可以只針對 Service 測商業邏輯，
-不需要每次都真的連資料庫。
+所有查詢都強制帶 owner_id 條件，把「只能看到自己的客戶」直接落在 SQL 層。
+比起撈回來再用 Python 比對，這樣少一個漏檢的機會。
 """
 
 from sqlalchemy import func, select
@@ -21,13 +21,14 @@ class LeadRepository:
         self.db.refresh(lead)
         return lead
 
-    def get(self, lead_id: int) -> Lead | None:
-        return self.db.get(Lead, lead_id)
+    def get_for_owner(self, lead_id: int, owner_id: int) -> Lead | None:
+        stmt = select(Lead).where(Lead.id == lead_id, Lead.owner_id == owner_id)
+        return self.db.execute(stmt).scalar_one_or_none()
 
-    def get_with_interactions(self, lead_id: int) -> Lead | None:
+    def get_with_interactions(self, lead_id: int, owner_id: int) -> Lead | None:
         stmt = (
             select(Lead)
-            .where(Lead.id == lead_id)
+            .where(Lead.id == lead_id, Lead.owner_id == owner_id)
             .options(selectinload(Lead.interactions))
         )
         return self.db.execute(stmt).scalar_one_or_none()
@@ -35,12 +36,13 @@ class LeadRepository:
     def list(
         self,
         *,
+        owner_id: int,
         status: LeadStatus | None = None,
         keyword: str | None = None,
         skip: int = 0,
         limit: int = 50,
     ) -> tuple[list[Lead], int]:
-        stmt = select(Lead)
+        stmt = select(Lead).where(Lead.owner_id == owner_id)
         if status is not None:
             stmt = stmt.where(Lead.status == status)
         if keyword:

@@ -68,7 +68,11 @@ class Lead(Base):
         SAEnum(LeadLevel, native_enum=False, length=10)
     )
 
-    owner_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    # 必填：每筆客戶都必須有歸屬的業務。
+    # 加索引是因為每一次查詢都會用 owner_id 過濾（資料隔離）。
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=False
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
@@ -77,7 +81,7 @@ class Lead(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
 
-    owner: Mapped["User | None"] = relationship(back_populates="leads")  # noqa: F821
+    owner: Mapped["User"] = relationship(back_populates="leads")  # noqa: F821
     interactions: Mapped[list["Interaction"]] = relationship(  # noqa: F821
         back_populates="lead",
         cascade="all, delete-orphan",

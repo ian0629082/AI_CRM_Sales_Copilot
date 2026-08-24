@@ -89,7 +89,7 @@ class LeadRead(BaseModel):
     lead_score: int | None
     lead_level: LeadLevel | None
 
-    owner_id: int | None
+    owner_id: int
     created_at: datetime
     updated_at: datetime
 
