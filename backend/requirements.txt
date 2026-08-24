@@ -7,9 +7,13 @@ pydantic[email]==2.10.4
 pydantic-settings==2.7.0
 python-dotenv==1.0.1
 
-# Sprint 1 後段：Authentication
-passlib[bcrypt]==1.7.4
-python-jose[cryptography]==3.3.0
+# Authentication
+# 直接使用 bcrypt，不經 passlib：passlib 1.7.4（2020 年後未更新）
+# 讀不到 bcrypt 5.x 的版號，連 hash 都會失敗。
+bcrypt==5.0.0
+# PyJWT 而非 python-jose：後者自 2021 年未更新，且其依賴 ecdsa 有已知的
+# timing attack 弱點（CVE-2024-23342）。FastAPI 官方文件現也改用 PyJWT。
+PyJWT==2.10.1
 
 # Testing
 pytest==8.3.4

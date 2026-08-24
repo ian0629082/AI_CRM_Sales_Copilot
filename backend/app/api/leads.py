@@ -7,8 +7,10 @@
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user
 from app.db.database import get_db
 from app.models.enums import LeadStatus
+from app.models.user import User
 from app.schemas.lead import (
     LeadCreate,
     LeadDetail,
@@ -21,8 +23,16 @@ from app.services.lead_service import LeadService
 router = APIRouter(prefix="/leads", tags=["leads"])
 
 
-def get_lead_service(db: Session = Depends(get_db)) -> LeadService:
-    return LeadService(db)
+def get_lead_service(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> LeadService:
+    """把登入者綁進 Service。
+
+    授權寫在這個 dependency 裡，而不是每支 route 各寫一次 —— 
+    少了重複，也就少了某支 API 忘記加保護的可能。
+    """
+    return LeadService(db, current_user)
 
 
 @router.post("", response_model=LeadRead, status_code=status.HTTP_201_CREATED)

@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api import interactions, leads
+from app.api import auth, interactions, leads
 from app.core.config import settings
 from app.core.exceptions import AppError
 
@@ -43,6 +43,7 @@ def handle_app_error(request: Request, exc: AppError):
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.message})
 
 
+app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(leads.router, prefix=settings.API_V1_PREFIX)
 app.include_router(interactions.router, prefix=settings.API_V1_PREFIX)
 

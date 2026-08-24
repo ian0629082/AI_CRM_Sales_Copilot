@@ -19,3 +19,18 @@ class AppError(Exception):
 class NotFoundError(AppError):
     status_code = 404
     message = "找不到資料"
+
+
+class ConflictError(AppError):
+    status_code = 409
+    message = "資料衝突"
+
+
+class UnauthorizedError(AppError):
+    status_code = 401
+    message = "身分驗證失敗"
+
+
+class ForbiddenError(AppError):
+    status_code = 403
+    message = "沒有權限執行此操作"
