@@ -1,0 +1,18 @@
+{
+  // 讓 VSCode 自動使用 backend 的虛擬環境，不必每次手動選 interpreter
+  "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
+
+  // 讓 VSCode 的 Testing 面板可以直接跑 pytest
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.cwd": "${workspaceFolder}/backend",
+  "python.testing.pytestArgs": ["tests"],
+
+  // 開新終端機時自動 activate 虛擬環境
+  "python.terminal.activateEnvironment": true,
+
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.pytest_cache": true
+  }
+}
