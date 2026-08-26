@@ -61,16 +61,27 @@
 
 ### Sprint 5 進行中
 
-已完成：
+**已完成**
 
 - 新增 `urgency` 欄位（AI 判斷急迫語氣），prompt v3 → v4
 - `ScoringService`：deterministic Rule Engine，滿分 100，逐條列出計分理由
+  - 需求明確度 55／聯絡方式 10／購買時機 35
+  - HOT ≥ 70、WARM ≥ 30
 - Need Follow-up：兩份分開的清單（新進未聯絡 / 到期跟進）+ 靜音機制
+  - 提醒天數由業務在記錄互動時決定，系統只給預設值
 - Dashboard：客戶總數、意願分佈、待跟進、成交率、銷售漏斗
 - 前端：計分理由卡片、下次提醒快捷鈕、列表靜音標示
-- 後端測試 156 個
+- Demo 資料 20 筆（`scripts/seed_demo.py`）
+- 後端測試 158 個
 
-未完成：AI Follow-up 建議、Follow-up Evaluation
+**未完成（下次從這裡開始）**
+
+1. **AI Follow-up Recommendation**——依 Lead 資料 + Score + 互動歷史產生跟進建議
+2. **Follow-up Evaluation**——Criteria-based 評估（是否使用互動歷史、是否捏造資訊、語氣是否合理）
+
+> 注意：Follow-up 建議是這個專案第一個「AI 生成自由文字」的功能。
+> 前面的 AI 都是抽取結構化欄位，有標準答案可以比對；
+> 建議沒有標準答案，所以評估方式必須不一樣（Criteria-based 而不是準確率）。
 
 ### 環境現況
 
@@ -147,6 +158,34 @@ v2 的 prompt 是看著 v1 在開發集上的錯誤寫出來的，它在開發�
 而且錯得很難察覺——沒有人會懷疑 87.3% 是算錯的。
 
 ### Scoring 與跟進（Sprint 5）
+
+> 這一節的每一條都來自**實務判斷**，不是從規劃書抄來的。
+> 專案作者有房仲業務經驗，下面幾條原本的設計都被他推翻過。
+
+**Lead Score 只看客戶本身，不看業務做了多少事。**
+一度把「帶看過」算進分數，後來拿掉：那對新客戶不公平——
+剛填完表單的客戶不管條件多好，那幾分都是結構性拿不到的。
+一個拿不到滿分的族群跟一個拿得到的族群，分數就不能互相比較，
+而不能比較的分數拿來排序是危險的。
+拿掉之後，剛進來、需求清楚又很急的客戶可以拿到 100 分，正是該立刻打電話的那種人。
+
+**HOT 門檻從 60 拉到 70。**
+在 20 筆 Demo 資料上跑，門檻 60 讓 74% 的客戶都變成「高意願」——
+三個裡有兩個都是 HOT，這個標籤就失去意義了。
+分數分佈顯示：有時間壓力的落在 90～100，需求完整但沒時間訊號的整群卡在 65。
+60 等於「需求填完整就算高意願」，70 才等於「需求完整 **且** 有時間壓力」。
+
+**`urgency` 這個欄位是被 Scoring 逼出來的。**
+`purchase_timeline` 要有明確月數才填得進去，但真實客戶很少那樣講話——
+具業務經驗的人出的 15 題測試資料裡，明確月數 0 筆。
+他們講的是「我下個月要過去上班，所以有點急」。
+這是「Scoring 的需求反過來定義 AI 該抽什麼」，不是先抽一堆欄位再想能拿來做什麼。
+
+**超過一年跟「說不急」同等看待，不必再細分。**
+一年半、兩年，在業務動作上沒有差別，都是往後排。
+所以 v2 那個「一年半沒抽到 18」的錯誤，業務上其實無關緊要——
+這也提醒了：欄位正確率把所有錯誤當成等重，但業務影響不是。
+
 
 **Lead Score 只看客戶本身，不看業務做了多少事。**
 一度把「帶看過」算進分數，後來拿掉：那對新客戶不公平——
@@ -316,11 +355,6 @@ AI 回 `null` 代表「客戶沒提到」，不代表「業務填錯了」。
 
 ## 四、後續 Sprint 規劃
 
-### Sprint 5 剩下的部分
-
-1. AI Follow-up Recommendation：依 Lead 資料 + Score + 互動歷史產生建議
-2. Follow-up Evaluation：Criteria-based（是否使用互動歷史、是否捏造資訊、語氣是否合理）
-
 ### Sprint 6：Quality
 
 Unit Test（Scoring 規則、驗證邏輯）、API Test、Logging、Error Handling、Security 檢查。
@@ -343,6 +377,52 @@ Demo 要能「Try Demo」一鍵進入，預先建立 30～50 筆虛構客戶。
 
 > 規劃書的核心提醒：**不要先做 Agent，再想 Agent 可以做什麼。**
 > 先把 CRM、AI Parsing、Scoring、Follow-up、RAG 每個能力做好並驗證，最後才組合成 Agent。
+
+---
+
+## 四之二、怎麼把專案跑起來
+
+**前後端要同時開，各佔一個終端機視窗。** 視窗關掉就等於伺服器關掉。
+
+```powershell
+# 視窗一：後端
+cd C:\project\AI-CRM_Sales_Copilot開發規劃ackend
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --port 8000
+
+# 視窗二：前端
+cd C:\project\AI-CRM_Sales_Copilot開發規劃rontend
+npm run dev
+```
+
+瀏覽器開 `http://localhost:3000`，登入 `demo@example.com` / `demo1234`。
+停止：各自視窗按 `Ctrl + C`。
+
+只開前端的話畫面出得來，但登入會失敗、客戶列表是空的——資料全部來自後端。
+
+### 部署之後還需要 server 嗎
+
+需要，只是不在你的電腦上：
+
+| | 現在 | Sprint 7 之後 |
+|---|---|---|
+| 前端 | 本機 `npm run dev` | Vercel |
+| 後端 | 本機 `uvicorn` | Render（雲端機器 24 小時開著） |
+| 資料庫 | Neon（已在雲端） | 不變 |
+
+> ⚠️ Render 免費方案**沒人用 15 分鐘就休眠**，第一個請求要等 30～50 秒喚醒。
+> 面試官點開作品可能以為壞掉了。Sprint 7 要處理這件事
+> （載入中提示，或用排程定期喚醒）。
+
+### 常用腳本
+
+```bash
+cd backend
+
+python -m scripts.seed_demo --reset      # 重建 20 筆 Demo 客戶
+python -m scripts.rescore_leads          # 調整計分權重後，回填既有客戶的分數
+python -m scripts.export_openapi         # 改了後端 schema 之後
+python -m scripts.evaluate_parsing --help  # 跑 AI 準確率評估
+```
 
 ---
 
@@ -387,10 +467,30 @@ cd frontend && npm run gen:api
 
 ## 六、下一步
 
-Sprint 5：Lead Scoring + Follow-up Recommendation。
+**接續 Sprint 5 的後半：AI Follow-up Recommendation。**
 
-第一個動作是 `ScoringService`——**deterministic Rule Engine，不由 LLM 決定分數**。
-`budget_is_approximate` 在這裡會第一次派上用場：說「2000 萬左右」的客戶
-通常還在觀望，與說「就是 2000 萬」的購買意願有差。
+分支已經開好了：`feature/lead-scoring`（Scoring 與 Dashboard 都在上面）。
 
-建議在 `feature/lead-scoring` 分支上進行。
+### 具體要做什麼
+
+1. `FollowUpService`：依 Lead 資料 + Score + 互動歷史，產生一段跟進建議
+2. Criteria-based 評估：有沒有用到互動歷史、有沒有捏造資訊、語氣合不合理
+
+### 開工前要先想清楚的一件事
+
+這是專案第一個「**AI 生成自由文字**」的功能，跟前面完全不同：
+
+| | Sprint 3 需求解析 | Sprint 5 跟進建議 |
+|---|---|---|
+| 輸出 | 結構化欄位 | 一段話 |
+| 有標準答案嗎 | 有（人工標註） | **沒有** |
+| 怎麼評估 | 逐欄位算準確率 | Criteria-based |
+
+所以 Sprint 4 那套評估機制**不能直接套用**。要另外想一套判準，
+例如「建議裡提到的事實，是否都能在互動紀錄裡找到出處」——
+那才是「有沒有捏造」的可驗證版本。
+
+### 還有一件小事
+
+期末考資料集（`backend/evaluation/final_test.json`）仍然鎖著，
+Sprint 7 上線前才第一次執行。跑它需要多打一個確認旗標。

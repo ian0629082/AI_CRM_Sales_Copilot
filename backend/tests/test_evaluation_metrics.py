@@ -292,6 +292,23 @@ def test_coverage_exemptions_are_documented():
             assert name in text, f"{filename} 豁免了 {name} 卻沒有記錄原因"
 
 
+def test_demo_data_does_not_reuse_evaluation_sentences():
+    """Demo 客戶的原話不能跟任何一份評估資料集重複。
+
+    重複的話，那些測試句子就會躺在 Demo 資料庫裡被反覆分析、被反覆看到答案，
+    「從沒被用來調整過任何東西」這個前提會慢慢失效 ——
+    尤其 final_test 是鎖到 Sprint 7 才開的期末考。
+
+    Demo 資料可以「參考」測試句子的風格，但不能重用句子本身。
+    """
+    from scripts.seed_demo import LEADS
+
+    demo = {spec["raw"] for spec in LEADS}
+    for name in DATASET_FILES:
+        overlap = demo & {c["raw_requirement"] for c in _load(name)["cases"]}
+        assert overlap == set(), f"Demo 資料與 {name} 重複：{overlap}"
+
+
 def test_no_sentence_appears_in_two_datasets():
     """三份資料集不能有重複的句子。
 
