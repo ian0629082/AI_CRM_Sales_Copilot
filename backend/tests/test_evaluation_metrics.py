@@ -194,7 +194,16 @@ def test_median_latency_and_token_totals():
 # ---------------------------------------------------------------- 資料集本身
 
 
-DATASET_FILES = ("dataset.json", "holdout.json")
+DATASET_FILES = ("dataset.json", "holdout.json", "final_test.json")
+
+# final_test.json 是取材自真實業務場景的句子，不是照規則造出來的，
+# 所以有幾個欄位天然沒被考到 —— 真實客戶很少講預算區間，
+# 講的時間也多半是工作行程而不是購屋時程。
+# 這是這份資料的事實，不是它的缺陷，所以在覆蓋率檢查上豁免這幾欄，
+# 並把原因記在該檔的 meta.known_coverage_gaps 裡。
+COVERAGE_EXEMPT = {
+    "final_test.json": {"budget_min", "purchase_timeline", "budget_is_approximate"},
+}
 
 
 def _load(filename: str) -> dict:
@@ -253,21 +262,41 @@ def test_dataset_covers_every_field_with_a_real_value(filename):
     報告上看起來有那一列，實際上什麼都沒量。
     """
     cases = _load(filename)["cases"]
+    exempt = COVERAGE_EXEMPT.get(filename, set())
 
     for name in FIELDS:
+        if name in exempt:
+            continue
         filled = sum(
             1 for c in cases if not is_empty(name, c["expected"].get(name))
         )
         assert filled >= 3, f"{filename} 的欄位 {name} 只有 {filled} 筆非空答案，樣本太少"
 
 
-def test_dev_and_holdout_share_no_sentences():
-    """兩份資料集不能有重複的句子。
+def test_coverage_exemptions_are_documented():
+    """豁免不能是偷偷加的，一定要在資料集裡寫明原因。
 
-    只要有一句重疊，holdout 就不再是「模型沒看過的題目」，
-    它的分數也就失去了「這是誠實數字」的意義。
+    否則日後看到報告上某欄位的 Recall 是「—」，
+    會分不清是「這份資料沒考到」還是「有人把它偷偷關掉了」。
     """
-    dev = {c["raw_requirement"] for c in _load("dataset.json")["cases"]}
-    holdout = {c["raw_requirement"] for c in _load("holdout.json")["cases"]}
+    for filename, exempt in COVERAGE_EXEMPT.items():
+        gaps = _load(filename)["meta"].get("known_coverage_gaps", [])
+        text = " ".join(gaps)
+        for name in exempt:
+            assert name in text, f"{filename} 豁免了 {name} 卻沒有記錄原因"
 
-    assert dev & holdout == set()
+
+def test_no_sentence_appears_in_two_datasets():
+    """三份資料集不能有重複的句子。
+
+    只要有一句重疊，holdout 與 final_test 就不再是「模型沒看過的題目」，
+    它們的分數也就失去了「這是誠實數字」的意義。
+    """
+    import itertools
+
+    sentences = {
+        name: {c["raw_requirement"] for c in _load(name)["cases"]}
+        for name in DATASET_FILES
+    }
+    for a, b in itertools.combinations(DATASET_FILES, 2):
+        assert sentences[a] & sentences[b] == set(), f"{a} 與 {b} 有重複句子"

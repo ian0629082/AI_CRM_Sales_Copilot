@@ -46,7 +46,16 @@ OUTPUT_DIR = BACKEND_DIR.parent / "docs" / "evaluation"
 DATASETS = {
     "dev": EVALUATION_DIR / "dataset.json",
     "holdout": EVALUATION_DIR / "holdout.json",
+    "final": EVALUATION_DIR / "final_test.json",
 }
+
+# final 是期末考：由具業務實務經驗、且未讀過 prompt 的人出題，
+# 鎖到 Sprint 7 上線前才第一次執行。
+#
+# 用程式擋而不是靠記性 —— 半年後誰還記得哪一份不能隨便跑？
+# 想跑要多打一個很長的旗標，那個動作本身就是在提醒你正在做什麼。
+LOCKED_DATASETS = {"final"}
+UNLOCK_FLAG = "--yes-i-am-spending-the-final-test"
 
 
 def parse_args() -> argparse.Namespace:
@@ -68,7 +77,17 @@ def parse_args() -> argparse.Namespace:
         "--dataset",
         default="dev",
         choices=sorted(DATASETS),
-        help="dev 是開發集（可以拿來調 prompt），holdout 是驗證集（只量測，不調）",
+        help=(
+            "dev 開發集（可以拿來調 prompt）、"
+            "holdout 驗證集（只量測）、"
+            "final 期末考（鎖定，Sprint 7 才開）"
+        ),
+    )
+    parser.add_argument(
+        UNLOCK_FLAG,
+        action="store_true",
+        dest="unlock_final",
+        help="確認要動用期末考資料集。跑完之後它就不再是乾淨的了。",
     )
     parser.add_argument(
         "--limit", type=int, default=None, help="只跑前 N 筆（先小量確認流程）"
@@ -121,6 +140,18 @@ def main() -> int:
 
     if not settings.OPENAI_API_KEY:
         print("錯誤：未設定 OPENAI_API_KEY，無法執行評估", file=sys.stderr)
+        return 1
+
+    if args.dataset in LOCKED_DATASETS and not args.unlock_final:
+        print(
+            f"「{args.dataset}」是鎖定的期末考資料集，不能隨手跑。\n"
+            "\n"
+            "它的價值全部來自「從沒被拿來調整過任何東西」。\n"
+            "跑過一次、又據此改了 prompt，它就變成第三個練習題。\n"
+            "\n"
+            f"確定要用掉它，加上 {UNLOCK_FLAG}",
+            file=sys.stderr,
+        )
         return 1
 
     dataset = json.loads(DATASETS[args.dataset].read_text(encoding="utf-8"))
