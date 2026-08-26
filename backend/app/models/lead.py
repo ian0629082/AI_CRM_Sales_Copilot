@@ -9,12 +9,13 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    false,
     func,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
-from app.models.enums import LeadLevel, LeadSource, LeadStatus, Purpose
+from app.models.enums import LeadLevel, LeadSource, LeadStatus, PropertyType, Purpose
 
 
 class Lead(Base):
@@ -53,7 +54,19 @@ class Lead(Base):
     location: Mapped[str | None] = mapped_column(String(100))
     budget_min: Mapped[int | None] = mapped_column(BigInteger)
     budget_max: Mapped[int | None] = mapped_column(BigInteger)
+    # 客戶說的是「2000 萬左右」還是「就是 2000 萬」。
+    # 搜尋時的 5% 緩衝由 Rule Engine 依這個旗標決定要不要加，
+    # 而不是讓 AI 直接吐一個算好的數字 —— 否則這兩種語意在資料庫裡就分不出來了。
+    budget_is_approximate: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
     rooms: Mapped[int | None] = mapped_column(Integer)
+    property_type: Mapped[PropertyType | None] = mapped_column(
+        SAEnum(PropertyType, native_enum=False, length=20)
+    )
+    building_age_max: Mapped[int | None] = mapped_column(
+        Integer, comment="可接受的屋齡上限（年）"
+    )
     parking: Mapped[bool | None] = mapped_column(Boolean)
     purpose: Mapped[Purpose | None] = mapped_column(
         SAEnum(Purpose, native_enum=False, length=20)
@@ -88,3 +101,17 @@ class Lead(Base):
         # 同一秒內建立的紀錄，用 id 當第二排序鍵，確保 Timeline 順序穩定
         order_by="(Interaction.created_at.desc(), Interaction.id.desc())",
     )
+    ai_analyses: Mapped[list["AIAnalysis"]] = relationship(  # noqa: F821
+        back_populates="lead",
+        cascade="all, delete-orphan",
+        order_by="AIAnalysis.id.desc()",
+    )
+
+    @property
+    def latest_analysis(self):
+        """最近一次 AI 分析。ai_analyses 已由新到舊排序，取第一筆即可。
+
+        放在 model 上而不是 service 裡：這是「Lead 這個東西本身的性質」，
+        每個需要它的地方（API、日後的 n8n、Agent）都能直接用，不必各自再寫一次。
+        """
+        return self.ai_analyses[0] if self.ai_analyses else None

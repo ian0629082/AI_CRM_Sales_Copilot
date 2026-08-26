@@ -48,6 +48,22 @@ class LeadSource(str, Enum):
     OTHER = "OTHER"
 
 
+class PropertyType(str, Enum):
+    """房屋類型。
+
+    只收這六類，是因為 AI 的輸出必須落在可列舉的集合裡：
+    若允許自由字串，「電梯大樓」「大樓」「電梯華廈」會變成三個不同的值，
+    Sprint 4 算準確率時就無法比對，日後要做物件搜尋也沒辦法下條件。
+    """
+
+    ELEVATOR_BUILDING = "ELEVATOR_BUILDING"  # 電梯大樓
+    LOW_RISE = "LOW_RISE"  # 華廈
+    APARTMENT = "APARTMENT"  # 公寓（無電梯）
+    TOWNHOUSE = "TOWNHOUSE"  # 透天厝
+    VILLA = "VILLA"  # 別墅
+    STUDIO = "STUDIO"  # 套房
+
+
 class Purpose(str, Enum):
     """購屋目的。AI 解析自然語言後會填入這個欄位。"""
 

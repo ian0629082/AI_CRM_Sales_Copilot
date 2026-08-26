@@ -1,6 +1,7 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
   Lead,
+  LeadAnalyzeResponse,
   LeadCreate,
   LeadDetail,
   LeadListResponse,
@@ -41,6 +42,19 @@ export function createLead(payload: LeadCreate): Promise<Lead> {
 
 export function updateLead(id: number, payload: LeadUpdate): Promise<Lead> {
   return apiRequest<Lead>(`/leads/${id}`, { method: "PATCH", body: payload });
+}
+
+/**
+ * 請 AI 解析這位客戶的原話。
+ *
+ * 這支 API 會等 OpenAI 回應（約 2～5 秒），呼叫端一定要顯示 loading。
+ * 失敗時後端回 503（AI 暫時不可用）或 422（這位客戶還沒填原話），
+ * 兩者要分開處理，使用者才知道該重試還是該先去補資料。
+ */
+export function analyzeLead(id: number): Promise<LeadAnalyzeResponse> {
+  return apiRequest<LeadAnalyzeResponse>(`/leads/${id}/analyze`, {
+    method: "POST",
+  });
 }
 
 export function deleteLead(id: number): Promise<void> {

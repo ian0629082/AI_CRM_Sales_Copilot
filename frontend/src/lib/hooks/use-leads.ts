@@ -55,6 +55,20 @@ export function useUpdateLead(id: number) {
   });
 }
 
+export function useAnalyzeLead(id: number) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => leadsApi.analyzeLead(id),
+    onSuccess: () => {
+      // 解析會改寫 lead 的需求欄位，列表頁的那筆資料也跟著過期了
+      queryClient.invalidateQueries({ queryKey: leadKeys.all });
+    },
+    // 不自動重試：這一次呼叫是有成本的（會真的花錢打 OpenAI）。
+    // 要不要再試一次，交給使用者按重試按鈕決定。
+    retry: false,
+  });
+}
+
 export function useDeleteLead() {
   const queryClient = useQueryClient();
   return useMutation({

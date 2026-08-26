@@ -10,7 +10,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
-from app.models.enums import LeadLevel, LeadSource, LeadStatus, Purpose
+from app.models.enums import LeadLevel, LeadSource, LeadStatus, PropertyType, Purpose
+from app.schemas.ai import AIAnalysisRead
 from app.schemas.interaction import InteractionRead
 
 
@@ -20,7 +21,12 @@ class LeadRequirementFields(BaseModel):
     location: str | None = Field(default=None, max_length=100)
     budget_min: int | None = Field(default=None, ge=0)
     budget_max: int | None = Field(default=None, ge=0)
+    # budget_is_approximate 刻意不放在這裡（也就是新增客戶時不能填）。
+    # 它回答的是「客戶說預算時的語氣」，這件事只有讀過原話才知道，
+    # 由 AI 解析填入，或事後用 PATCH 修改。
     rooms: int | None = Field(default=None, ge=0, le=20)
+    property_type: PropertyType | None = None
+    building_age_max: int | None = Field(default=None, ge=0, le=100)
     parking: bool | None = None
     purpose: Purpose | None = None
     purchase_timeline: int | None = Field(
@@ -59,7 +65,10 @@ class LeadUpdate(BaseModel):
     location: str | None = Field(default=None, max_length=100)
     budget_min: int | None = Field(default=None, ge=0)
     budget_max: int | None = Field(default=None, ge=0)
+    budget_is_approximate: bool | None = None
     rooms: int | None = Field(default=None, ge=0, le=20)
+    property_type: PropertyType | None = None
+    building_age_max: int | None = Field(default=None, ge=0, le=100)
     parking: bool | None = None
     purpose: Purpose | None = None
     purchase_timeline: int | None = Field(default=None, ge=0, le=120)
@@ -81,7 +90,10 @@ class LeadRead(BaseModel):
     location: str | None
     budget_min: int | None
     budget_max: int | None
+    budget_is_approximate: bool
     rooms: int | None
+    property_type: PropertyType | None
+    building_age_max: int | None
     parking: bool | None
     purpose: Purpose | None
     purchase_timeline: int | None
@@ -109,3 +121,17 @@ class LeadDetail(LeadRead):
     """
 
     interactions: list[InteractionRead] = []
+    # 最近一次 AI 解析。前端靠它決定哪些欄位要掛「AI 解析」徽章，
+    # 重新整理頁面後徽章也還在（不是只存在前端記憶體裡的狀態）。
+    latest_analysis: AIAnalysisRead | None = None
+
+
+class LeadAnalyzeResponse(BaseModel):
+    """POST /leads/{id}/analyze 的回應。
+
+    一併回傳更新後的 lead，前端就不必再打一次 GET —— 少一次來回，
+    也少一次「畫面上還是舊資料」的機會。
+    """
+
+    lead: LeadRead
+    analysis: AIAnalysisRead
