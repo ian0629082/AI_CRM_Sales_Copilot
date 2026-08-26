@@ -134,13 +134,39 @@ def test_analyze_records_metadata_for_later_evaluation(ai_client):
 
     analysis = ai_client.post(f"{PREFIX}/leads/{lead['id']}/analyze").json()["analysis"]
 
-    # prompt_version 與 model 是 Sprint 4 要拿來比較「換了之後有沒有比較準」的依據
-    assert analysis["prompt_version"] == "lead_analysis_v1"
+    # prompt_version 與 model 是 Sprint 4 拿來比較「換了之後有沒有比較準」的依據。
+    # 這裡刻意寫死版號而不是引用 DEFAULT_PROMPT_VERSION：
+    # 改了預設版本就該讓這個測試紅一次，逼人確認「這次改版有跑過評估嗎」。
+    assert analysis["prompt_version"] == "lead_analysis_v2"
     assert analysis["model"] == "fake-model"
     assert analysis["prompt_tokens"] == 100
     assert analysis["completion_tokens"] == 50
     assert analysis["latency_ms"] is not None
     assert analysis["parsed_result"]["location"] == "七期"
+
+
+def test_prompt_version_is_selectable_and_recorded(fake_llm):
+    """舊版 prompt 要能被選來跑，而且紀錄裡存的是實際用的那一版。
+
+    這是 Sprint 4 能做 A/B 比較的前提：兩個版本跑同一份資料集，
+    數字才擺得到一起。存錯版號的話，比較出來的結論就是錯的。
+    """
+    from app.services.ai_service import PROMPT_V1, AIService
+
+    service = AIService(fake_llm, prompt_version=PROMPT_V1)
+    outcome = service.parse_requirement("七期三房")
+
+    assert outcome.prompt_version == PROMPT_V1
+    # 送出去的真的是 v1 的內容，不是預設那一版
+    assert fake_llm.calls[0]["system_prompt"].endswith('「想找信義區」→ "信義區"\n')
+
+
+def test_unknown_prompt_version_is_rejected_at_construction(fake_llm):
+    """打錯版號要當場爆掉，而不是安靜地用預設版本跑完整份評估。"""
+    from app.services.ai_service import AIService
+
+    with pytest.raises(ValueError, match="未知的 prompt 版本"):
+        AIService(fake_llm, prompt_version="lead_analysis_v99")
 
 
 def test_analyze_sends_raw_requirement_to_the_model(ai_client, fake_llm):
@@ -161,7 +187,7 @@ def test_detail_page_exposes_latest_analysis(ai_client):
     detail = ai_client.get(f"{PREFIX}/leads/{lead['id']}").json()
 
     # 前端靠這個決定要不要掛「AI 解析」徽章，重新整理後徽章才不會消失
-    assert detail["latest_analysis"]["prompt_version"] == "lead_analysis_v1"
+    assert detail["latest_analysis"]["prompt_version"] == "lead_analysis_v2"
 
 
 def test_latest_analysis_is_none_before_any_analysis(ai_client):

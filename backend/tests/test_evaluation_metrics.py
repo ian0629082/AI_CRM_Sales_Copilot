@@ -1,0 +1,273 @@
+"""評估指標的單元測試。
+
+為什麼評估程式也要測？因為**一份算錯的準確率比沒有準確率更糟** ——
+它會讓人對著錯的方向調 prompt，而且錯得很難察覺
+（數字看起來總是「合理」的，沒人會懷疑 87.3% 是算錯的）。
+
+這裡不呼叫 OpenAI，測的純粹是比對與統計邏輯。
+"""
+
+import pytest
+
+from evaluation.metrics import (
+    FIELDS,
+    CaseResult,
+    Outcome,
+    build_report,
+    classify,
+    compare_case,
+    is_empty,
+)
+
+
+def _expected(**overrides) -> dict:
+    base = {name: None for name in FIELDS}
+    base["budget_is_approximate"] = False
+    base.update(overrides)
+    return base
+
+
+def _case(case_id: str, expected: dict, actual: dict) -> CaseResult:
+    return CaseResult(
+        case_id=case_id,
+        raw_requirement="（測試用）",
+        tags=[],
+        expected=expected,
+        actual=actual,
+        outcomes=compare_case(expected, actual),
+    )
+
+
+# ---------------------------------------------------------------- 四種結果的判定
+
+
+@pytest.mark.parametrize(
+    ("expected", "actual", "want"),
+    [
+        ("七期", "七期", Outcome.CORRECT),
+        (None, None, Outcome.CORRECT),
+        ("七期", None, Outcome.MISS),
+        (None, "七期", Outcome.HALLUCINATION),
+        ("七期", "信義區", Outcome.WRONG),
+    ],
+)
+def test_classify_covers_four_outcomes(expected, actual, want):
+    assert classify("location", expected, actual) is want
+
+
+def test_hallucination_is_distinguished_from_wrong():
+    """捏造與抽錯必須分開。
+
+    「客戶沒提到預算，模型生了一個 2000 萬」跟
+    「客戶說 2000 萬，模型抽成 200 萬」是兩種完全不同的問題：
+    前者是在 CRM 裡製造假資訊，後者是換算錯誤。
+    混在一起看，就不知道該修 prompt 的哪一段。
+    """
+    assert classify("budget_max", None, 20000000) is Outcome.HALLUCINATION
+    assert classify("budget_max", 20000000, 2000000) is Outcome.WRONG
+
+
+# ---------------------------------------------------------------- 空值的定義
+
+
+def test_false_counts_as_empty_only_for_budget_is_approximate():
+    """budget_is_approximate 的 false 等同「沒有這個資訊」，parking 的 false 不是。
+
+    如果不這樣分，模型只要把每一筆 budget_is_approximate 都填 false，
+    就能在那個欄位刷到很高的分數 —— 而那什麼也沒說明。
+
+    parking 的 false 則是客戶明確說「不用車位」，是真正的資訊，答對就該算答對。
+    """
+    assert is_empty("budget_is_approximate", False) is True
+    assert is_empty("parking", False) is False
+
+    # 客戶沒講預算語氣，模型硬標成「概數」→ 捏造
+    assert classify("budget_is_approximate", False, True) is Outcome.HALLUCINATION
+    # 客戶明確說不用車位，模型也答 false → 這是抽對了
+    assert classify("parking", False, False) is Outcome.CORRECT
+
+
+def test_always_answering_false_does_not_inflate_recall():
+    """一個永遠回 false 的模型，在 budget_is_approximate 上的 recall 必須是 0。"""
+    cases = [
+        _case(
+            f"case-{i}",
+            _expected(budget_is_approximate=True, budget_max=20000000),
+            _expected(budget_is_approximate=False, budget_max=20000000),
+        )
+        for i in range(5)
+    ]
+    report = build_report(model="m", prompt_version="v", cases=cases)
+
+    stats = report.per_field["budget_is_approximate"]
+    assert stats.recall == 0.0
+    assert stats.miss == 5
+
+
+# ---------------------------------------------------------------- 統計彙總
+
+
+def test_field_accuracy_counts_every_field_of_every_case():
+    """一筆全對、一筆錯一個欄位 → 20 個欄位裡對 19 個。"""
+    cases = [
+        _case("case-1", _expected(location="七期"), _expected(location="七期")),
+        _case("case-2", _expected(location="信義區"), _expected(location="大安區")),
+    ]
+    report = build_report(model="m", prompt_version="v", cases=cases)
+
+    assert report.field_accuracy == pytest.approx(19 / 20)
+
+
+def test_exact_match_rate_requires_all_ten_fields():
+    """完全正確率是最嚴格的指標：錯一個欄位，整筆就不算對。"""
+    cases = [
+        _case("case-1", _expected(rooms=3), _expected(rooms=3)),
+        _case("case-2", _expected(rooms=3, location="七期"), _expected(rooms=3)),
+    ]
+    report = build_report(model="m", prompt_version="v", cases=cases)
+
+    assert report.exact_match_rate == pytest.approx(0.5)
+
+
+def test_hallucination_rate_is_measured_against_empty_fields_only():
+    """捏造率的分母是「客戶沒提到的欄位數」，不是全部欄位數。
+
+    用全部欄位當分母會把這個數字稀釋掉：
+    客戶講了很多的案例會讓捏造率看起來變低，但模型的行為根本沒變。
+    """
+    # 客戶只講了房數，其餘 9 個欄位是空的；模型多生了一個 location
+    case = _case("case-1", _expected(rooms=3), _expected(rooms=3, location="七期"))
+    report = build_report(model="m", prompt_version="v", cases=[case])
+
+    # 9 個空欄位中捏造了 1 個
+    assert report.hallucination_rate == pytest.approx(1 / 9)
+
+
+def test_precision_and_recall_are_none_when_there_is_nothing_to_measure():
+    """沒有任何案例提到某個欄位時，該欄位的 recall 是「無從得知」而不是 0。
+
+    回 0 會讓報告出現「purpose recall 0%」這種誤導性的結論 ——
+    實際上只是資料集裡沒有考到它。
+    """
+    case = _case("case-1", _expected(), _expected())
+    report = build_report(model="m", prompt_version="v", cases=[case])
+
+    stats = report.per_field["purpose"]
+    assert stats.recall is None
+    assert stats.precision is None
+    assert stats.accuracy == 1.0
+
+
+def test_failed_cases_are_kept_out_of_the_accuracy_numbers():
+    """逾時失敗不能算成「答錯」。
+
+    那是基礎設施問題，跟模型理解錯誤是兩回事，
+    混進去會讓準確率變得無法解讀（分數低到底是模型爛還是網路不穩？）。
+    """
+    case = _case("case-1", _expected(rooms=3), _expected(rooms=3))
+    report = build_report(
+        model="m",
+        prompt_version="v",
+        cases=[case],
+        failed_cases=[("case-2", "呼叫逾時")],
+    )
+
+    assert report.field_accuracy == 1.0
+    assert report.exact_match_rate == 1.0
+    assert len(report.failed_cases) == 1
+
+
+def test_median_latency_and_token_totals():
+    report = build_report(
+        model="m",
+        prompt_version="v",
+        cases=[],
+        prompt_tokens=800,
+        completion_tokens=60,
+        latencies_ms=[1000, 2000, 3000],
+    )
+
+    assert report.median_latency_ms == 2000
+    assert report.prompt_tokens + report.completion_tokens == 860
+
+
+# ---------------------------------------------------------------- 資料集本身
+
+
+DATASET_FILES = ("dataset.json", "holdout.json")
+
+
+def _load(filename: str) -> dict:
+    import json
+    import pathlib
+
+    path = pathlib.Path(__file__).resolve().parents[1] / "evaluation" / filename
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+@pytest.mark.parametrize("filename", DATASET_FILES)
+def test_dataset_is_well_formed(filename):
+    """資料集的每一筆都要有完整的 10 個欄位標註。
+
+    少標一個欄位不會讓程式壞掉，只會讓那個欄位被當成 null 靜靜地算進統計，
+    然後產出一個沒人發現是錯的準確率。所以這裡要擋住。
+    """
+    from app.models.enums import PropertyType, Purpose
+
+    dataset = _load(filename)
+    cases = dataset["cases"]
+
+    assert len(cases) == dataset["meta"]["case_count"]
+
+    seen_ids = set()
+    for case in cases:
+        assert case["id"] not in seen_ids, f"{case['id']} 重複"
+        seen_ids.add(case["id"])
+
+        assert case["raw_requirement"].strip(), f"{case['id']} 原話是空的"
+        assert set(case["expected"]) == set(FIELDS), f"{case['id']} 欄位不齊"
+
+        expected = case["expected"]
+        assert isinstance(expected["budget_is_approximate"], bool)
+
+        if expected["property_type"] is not None:
+            assert expected["property_type"] in {t.value for t in PropertyType}
+        if expected["purpose"] is not None:
+            assert expected["purpose"] in {p.value for p in Purpose}
+
+        low, high = expected["budget_min"], expected["budget_max"]
+        if low is not None and high is not None:
+            assert low <= high, f"{case['id']} 預算下限大於上限"
+
+        if expected["budget_is_approximate"]:
+            assert low is not None or high is not None, (
+                f"{case['id']} 標成概數卻沒有預算數字"
+            )
+
+
+@pytest.mark.parametrize("filename", DATASET_FILES)
+def test_dataset_covers_every_field_with_a_real_value(filename):
+    """每個欄位都至少要有幾筆非空的正確答案。
+
+    否則那個欄位的 recall 會是 None，等於根本沒被評估到 ——
+    報告上看起來有那一列，實際上什麼都沒量。
+    """
+    cases = _load(filename)["cases"]
+
+    for name in FIELDS:
+        filled = sum(
+            1 for c in cases if not is_empty(name, c["expected"].get(name))
+        )
+        assert filled >= 3, f"{filename} 的欄位 {name} 只有 {filled} 筆非空答案，樣本太少"
+
+
+def test_dev_and_holdout_share_no_sentences():
+    """兩份資料集不能有重複的句子。
+
+    只要有一句重疊，holdout 就不再是「模型沒看過的題目」，
+    它的分數也就失去了「這是誠實數字」的意義。
+    """
+    dev = {c["raw_requirement"] for c in _load("dataset.json")["cases"]}
+    holdout = {c["raw_requirement"] for c in _load("holdout.json")["cases"]}
+
+    assert dev & holdout == set()

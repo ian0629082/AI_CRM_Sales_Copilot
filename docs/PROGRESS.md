@@ -15,7 +15,7 @@
 | 1 | CRM Core：Lead & Interaction CRUD、Auth、Alembic | ✅ |
 | 2 | Vertical Slice：Next.js 前端，前端到資料庫全鏈路跑通 | ✅ |
 | 3 | AI Requirement Parsing | ✅ |
-| 4 | AI Evaluation Dataset | ⬜ |
+| 4 | AI Evaluation Dataset | ✅ |
 | 5 | Lead Scoring + Follow-up Recommendation | ⬜ |
 | 6 | Quality：Testing / Logging / Error Handling / Security | ⬜ |
 | 7 | Deployment：Docker / CI/CD / 上線 | ⬜ **← MVP 完成，可開始投履歷** |
@@ -49,6 +49,16 @@
 - 前端：「AI 解析」按鈕、loading、失敗就地重試、欄位上的 `AI` 徽章
 - 後端測試 85 個（新增 20 個，全部用假 provider，不呼叫真實 OpenAI）
 
+### Sprint 4 完成內容
+
+- 開發集 40 筆 + **held-out 驗證集 21 筆**，Ground Truth 全人工標註
+- 評估腳本可切換模型與 prompt 版本，逐欄位計算正確率、Recall、Precision、捏造率
+- Error Analysis 指出 v1 的錯誤 78% 集中在 `location` → 據此寫出 prompt v2
+- **驗證集成績：欄位正確率 99.5%、完全正確率 95.2%、捏造率 0%**
+- 模型比較結論：gpt-5.4-mini 是甜蜜點，換 gpt-5.4 買不到準確率
+- 完整結果見 [docs/evaluation/README.md](evaluation/README.md)
+- 後端測試 106 個
+
 ### 環境現況
 
 | 項目 | 狀態 |
@@ -58,6 +68,7 @@
 | 分支 | `main` / `develop` / `feature/*`，皆已推送 |
 | OpenAI API Key | 已填入 `backend/.env` |
 | LLM 型號 | `gpt-5.4-mini`（環境變數 `OPENAI_MODEL`，換型號不必改程式碼） |
+| Prompt 版本 | `lead_analysis_v2`（v1 保留在程式碼中，供評估比較用） |
 | Docker | 尚未安裝（Sprint 7 才需要） |
 | Demo 帳號 | `demo@example.com` / `demo1234`，Neon 上有測試資料 |
 
@@ -102,6 +113,25 @@ token 簽章有效不代表帳號還在，只驗簽章是不夠的。
 
 **用 PyJWT 而非 python-jose。**
 後者自 2021 年未更新，其依賴 ecdsa 有已知的 timing attack 弱點（CVE-2024-23342）。FastAPI 官方文件現也改用 PyJWT。
+
+### 評估層面（Sprint 4）
+
+**資料集分成開發集與 held-out 驗證集。**
+v2 的 prompt 是看著 v1 在開發集上的錯誤寫出來的，它在開發集拿 100% 沒有意義——
+等於對著考卷改答案。只有從未參與調校的驗證集，數字才能對外引用。
+兩份分數的落差（開發集 +20 個百分點 vs 驗證集 +9.5 個）本身就是過擬合程度的估計值。
+
+**資料集不用 LLM 生成。**
+若用同一個模型出題又拿它作答，量到的是自我一致性，不是準確率。
+
+**捏造與漏抽要分開統計。**
+「客戶沒提到預算，模型生了一個 2000 萬」跟「客戶說 2000 萬，模型抽成 200 萬」
+是兩種不同的問題，混在一起看就不知道該修 prompt 的哪一段。
+捏造是最不能妥協的指標——CRM 裡出現客戶從沒說過的資訊，比欄位空著嚴重得多。
+
+**評估程式本身要有單元測試。**
+一份算錯的準確率比沒有準確率更糟，它會讓人對著錯的方向調 prompt，
+而且錯得很難察覺——沒有人會懷疑 87.3% 是算錯的。
 
 ### 前端層面
 
@@ -242,19 +272,6 @@ AI 回 `null` 代表「客戶沒提到」，不代表「業務填錯了」。
 
 ## 四、後續 Sprint 規劃
 
-### Sprint 4：AI Evaluation
-
-1. 建立 `tests/evaluation_dataset.json`，30～100 筆模擬客戶需求
-2. 人工標註 Ground Truth（10 個欄位 × 每筆）
-3. 撰寫評估腳本，逐欄位計算準確率
-4. Error Analysis：哪些欄位容易錯、為什麼
-5. 可比較不同模型的準確率與成本
-
-**產出**：「Location 98% / Budget 96% / Rooms 100% / Timeline 87%」這種可以寫進履歷的數字。
-
-> 這是整個專案最枯燥但最有價值的一段。「準確率 96%」能不能講，全靠它。
-> 屆時會先產生候選資料供校對，不必從零手寫。
-
 ### Sprint 5：Lead Scoring + Follow-up
 
 1. `ScoringService`：**deterministic Rule Engine**，不由 LLM 決定分數
@@ -332,9 +349,10 @@ cd frontend && npm run gen:api
 
 ## 六、下一步
 
-Sprint 4：AI Evaluation。第一個動作是**建立 `tests/evaluation_dataset.json`**，
-30～100 筆模擬客戶需求，逐筆人工標註 10 個欄位的 Ground Truth。
+Sprint 5：Lead Scoring + Follow-up Recommendation。
 
-標註標準就是第三節那張「抽取規則」表——它當初就是為了這一刻才先定下來的。
+第一個動作是 `ScoringService`——**deterministic Rule Engine，不由 LLM 決定分數**。
+`budget_is_approximate` 在這裡會第一次派上用場：說「2000 萬左右」的客戶
+通常還在觀望，與說「就是 2000 萬」的購買意願有差。
 
-建議在 `feature/ai-evaluation` 分支上進行。
+建議在 `feature/lead-scoring` 分支上進行。
