@@ -18,11 +18,24 @@ AI 的角色是**把非結構化的原話變成結構化欄位**（Sprint 3）�
 
 ---
 
-計分分成三個維度，各自有滿分，加起來 100：
+計分只看**客戶本身**，不看業務做了多少事：
 
-    需求明確度  40   他到底想要什麼，說得多清楚
-    互動與聯繫  30   找不找得到他，他有沒有真的動起來
-    購買時機    30   現在買，還是明年再說
+    需求明確度  55   他到底想要什麼，說得多清楚
+    聯絡方式    10   找不找得到他
+    購買時機    35   現在買，還是明年再說
+
+### 為什麼互動紀錄不計分
+
+一度把「帶看過」算進分數裡，後來拿掉了，理由是**那對新客戶不公平**：
+剛填完表單的客戶，不管條件多好，那幾分都是結構性拿不到的。
+一個拿不到滿分的族群跟一個拿得到的族群，分數就不能互相比較，
+而「不能互相比較的分數」拿來排序是危險的。
+
+拿掉之後，一個剛進來、需求寫得清楚又很急的新客戶可以拿到 100 分 ——
+這正是業務最該立刻打電話的那種人。
+
+「跟進到哪一步了」是另一個問題，由 Need Follow-up 回答（見 follow_up.py），
+兩件事分開算，各自才講得清楚。
 
 滿分制而不是無上限累加，是為了讓分數之間可以互相比較 ——
 「65 分」要能一眼看出是「拿到三分之二」，而不是一個沒有基準的數字。
@@ -32,40 +45,26 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.models.enums import InteractionType, LeadLevel, Urgency
-from app.models.interaction import Interaction
+from app.models.enums import LeadLevel, Urgency
 from app.models.lead import Lead
 
-# --- 需求明確度（滿分 40）---
-POINTS_BUDGET_EXACT = 15
+# --- 需求明確度（滿分 55）---
+POINTS_BUDGET_EXACT = 20
 # 「2000 萬左右」的客戶通常還在觀望，跟「就是 2000 萬」的購買意願有差。
 # budget_is_approximate 這個欄位當初在 Sprint 3 建立，就是為了這一刻。
-POINTS_BUDGET_APPROXIMATE = 8
-POINTS_LOCATION = 10
-POINTS_PROPERTY = 10
+POINTS_BUDGET_APPROXIMATE = 10
+POINTS_LOCATION = 15
+POINTS_PROPERTY = 15
 POINTS_PURPOSE = 5
 
-# --- 互動與聯繫（滿分 30）---
+# --- 聯絡方式（滿分 10）---
 POINTS_PHONE = 10
 
-# 互動不是「有或沒有」，而是有多深。
-# 業務自己寫一則備註跟客戶陪你看了三間房，在 CRM 裡都是「有互動紀錄」，
-# 但意義天差地遠。所以看的是客戶實際做到哪一步。
-INTERACTION_DEPTH: dict[InteractionType, int] = {
-    InteractionType.VIEWING: 20,  # 帶看：客戶真的出門了，這是最強的訊號
-    InteractionType.MEETING: 15,  # 會面
-    InteractionType.CALL: 10,
-    InteractionType.LINE: 10,
-    InteractionType.EMAIL: 10,
-    # NOTE 不給分：那是業務寫給自己看的，客戶根本沒有任何動作。
-    InteractionType.NOTE: 0,
-}
-MAX_INTERACTION_POINTS = 20
-
-# --- 購買時機（滿分 30）---
+# --- 購買時機（滿分 35）---
+# 時機是單項權重最高的，因為在房仲實務上它決定了「現在投入有沒有用」。
 URGENT_MONTHS = 3
 MID_TERM_MONTHS = 12
-POINTS_TIMING_URGENT = 30
+POINTS_TIMING_URGENT = 35
 POINTS_TIMING_MID = 10
 # 「客戶說不急」是資訊，「客戶沒講」是沒有資訊，兩者不該同分。
 # 已知的冷客戶應該排在未知客戶的後面 —— 沒講的那位，說不定其實很急。
@@ -127,31 +126,11 @@ def _requirement_reasons(lead: Lead) -> list[ScoreReason]:
     return reasons
 
 
-def _contact_reasons(lead: Lead, interactions: list[Interaction]) -> list[ScoreReason]:
-    """互動與聯繫：找不找得到他，他有沒有真的動起來。"""
-    reasons: list[ScoreReason] = []
-
+def _contact_reasons(lead: Lead) -> list[ScoreReason]:
+    """聯絡方式：找不找得到他。"""
     if lead.phone:
-        reasons.append(ScoreReason("phone", "有留電話", POINTS_PHONE))
-
-    if interactions:
-        # 取最深的那一次，不是累加。
-        # 累加的話，打十通沒接的電話會贏過一次帶看，那不合實務。
-        best = max(interactions, key=lambda i: INTERACTION_DEPTH.get(i.type, 0))
-        points = INTERACTION_DEPTH.get(best.type, 0)
-        if points > 0:
-            labels = {
-                InteractionType.VIEWING: "已帶看",
-                InteractionType.MEETING: "已會面",
-                InteractionType.CALL: "有通話紀錄",
-                InteractionType.LINE: "有 LINE 往來",
-                InteractionType.EMAIL: "有 Email 往來",
-            }
-            reasons.append(
-                ScoreReason("interaction", labels[best.type], points)
-            )
-
-    return reasons
+        return [ScoreReason("phone", "有留電話", POINTS_PHONE)]
+    return []
 
 
 def _timing_reasons(lead: Lead) -> list[ScoreReason]:
@@ -195,15 +174,18 @@ def level_for_score(score: int) -> LeadLevel:
     return LeadLevel.COLD
 
 
-def calculate_score(lead: Lead, interactions: list[Interaction]) -> ScoreResult:
+def calculate_score(lead: Lead) -> ScoreResult:
     """算出這位客戶的分數、等級與逐條理由。
+
+    參數只有 lead，沒有 interactions —— 這個簽名本身就是設計聲明：
+    Lead Score 只看客戶本身，不看業務做了多少事。
 
     純函式：同樣的輸入永遠得到同樣的輸出，不碰資料庫也不碰網路。
     所以它的測試不需要任何 mock。
     """
     reasons = [
         *_requirement_reasons(lead),
-        *_contact_reasons(lead, interactions),
+        *_contact_reasons(lead),
         *_timing_reasons(lead),
     ]
 

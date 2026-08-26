@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    Date,
     DateTime,
     Enum as SAEnum,
     ForeignKey,
@@ -85,6 +86,19 @@ class Lead(Base):
     # 少了這一欄，那種客戶在 Lead Score 上會被當成沒有時間壓力。
     urgency: Mapped[Urgency | None] = mapped_column(
         SAEnum(Urgency, native_enum=False, length=10)
+    )
+
+    # --- 跟進提醒（Sprint 5）---
+    # 下次該聯絡的日期，由業務在記錄互動時決定，系統只提供預設值。
+    # 一度想寫一整張「什麼階段隔幾天」的規則表，後來拿掉了：
+    # 客戶掛電話前說「我下週三再回你」，業務填 7 天就對了，規則猜不到那句話。
+    next_follow_up_at: Mapped[date | None] = mapped_column(Date, index=True)
+
+    # 業務明確關掉提醒（成交、流失、確定放棄）。
+    # 與 next_follow_up_at 為 NULL 分開表示：NULL 是「還沒設」，
+    # 這個是「刻意不要」。兩者混在一起的話，就分不出「漏設」與「不用設」。
+    follow_up_muted: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
     )
 
     # --- Rule Engine 計算（Sprint 5）---

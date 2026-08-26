@@ -256,6 +256,33 @@
         }
       }
     },
+    "/api/v1/leads/follow-ups": {
+      "get": {
+        "tags": [
+          "leads"
+        ],
+        "summary": "List Follow Ups",
+        "description": "今天該聯絡誰。\n\n路由必須註冊在 /{lead_id} 之前，否則 \"follow-ups\" 會被當成 lead_id\n去比對，然後回一個看起來莫名其妙的 422。",
+        "operationId": "list_follow_ups_api_v1_leads_follow_ups_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FollowUpResponse"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/leads/{lead_id}": {
       "get": {
         "tags": [
@@ -704,6 +731,64 @@
         "title": "AIAnalysisRead",
         "description": "一次 AI 分析的紀錄，回給前端用來顯示「AI 解析」徽章與分析時間。"
       },
+      "FollowUpItem": {
+        "properties": {
+          "lead": {
+            "$ref": "#/components/schemas/LeadRead"
+          },
+          "bucket": {
+            "type": "string",
+            "title": "Bucket"
+          },
+          "days_overdue": {
+            "type": "integer",
+            "title": "Days Overdue"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lead",
+          "bucket",
+          "days_overdue",
+          "reason"
+        ],
+        "title": "FollowUpItem",
+        "description": "待跟進清單上的一列。"
+      },
+      "FollowUpResponse": {
+        "properties": {
+          "new_uncontacted": {
+            "items": {
+              "$ref": "#/components/schemas/FollowUpItem"
+            },
+            "type": "array",
+            "title": "New Uncontacted"
+          },
+          "due": {
+            "items": {
+              "$ref": "#/components/schemas/FollowUpItem"
+            },
+            "type": "array",
+            "title": "Due"
+          },
+          "muted_count": {
+            "type": "integer",
+            "title": "Muted Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "new_uncontacted",
+          "due",
+          "muted_count"
+        ],
+        "title": "FollowUpResponse",
+        "description": "待跟進清單，刻意分成兩堆而不是一份排序好的名單。\n\n「新進未聯絡」與「到期跟進」對應兩種不同的業務動作：\n一個是第一次接觸（搶時間），一個是維繫（別讓它冷掉）。\n混在一起的話，業務打開看到 20 個人，\n分不出哪些是還沒認識、哪些是快跑掉了。"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -726,6 +811,24 @@
             "type": "string",
             "minLength": 1,
             "title": "Content"
+          },
+          "next_follow_up_days": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 365.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Follow Up Days"
+          },
+          "mute_follow_up": {
+            "type": "boolean",
+            "title": "Mute Follow Up",
+            "default": false
           }
         },
         "type": "object",
@@ -1129,6 +1232,22 @@
               }
             ]
           },
+          "next_follow_up_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Follow Up At"
+          },
+          "follow_up_muted": {
+            "type": "boolean",
+            "title": "Follow Up Muted"
+          },
           "lead_score": {
             "anyOf": [
               {
@@ -1211,6 +1330,8 @@
           "purpose",
           "purchase_timeline",
           "urgency",
+          "next_follow_up_at",
+          "follow_up_muted",
           "lead_score",
           "lead_level",
           "owner_id",
@@ -1412,6 +1533,22 @@
               }
             ]
           },
+          "next_follow_up_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Follow Up At"
+          },
+          "follow_up_muted": {
+            "type": "boolean",
+            "title": "Follow Up Muted"
+          },
           "lead_score": {
             "anyOf": [
               {
@@ -1468,6 +1605,8 @@
           "purpose",
           "purchase_timeline",
           "urgency",
+          "next_follow_up_at",
+          "follow_up_muted",
           "lead_score",
           "lead_level",
           "owner_id",
@@ -1700,6 +1839,29 @@
                 "type": "null"
               }
             ]
+          },
+          "next_follow_up_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Follow Up At"
+          },
+          "follow_up_muted": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Follow Up Muted"
           }
         },
         "type": "object",

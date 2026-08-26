@@ -5,20 +5,13 @@
 不該綁的東西上（例如直接讀資料庫）。
 
 測試的重點不是「65 分對不對」，而是**規則之間的相對關係**：
-帶看要贏過通話、說不急要輸給沒講、概數預算要輸給精確預算。
+說不急要輸給沒講、概數預算要輸給精確預算。
 分數的絕對值日後可能會調，但這些關係一旦反了，排序就是錯的。
 """
 
 import pytest
 
-from app.models.enums import (
-    InteractionType,
-    LeadLevel,
-    PropertyType,
-    Purpose,
-    Urgency,
-)
-from app.models.interaction import Interaction
+from app.models.enums import LeadLevel, PropertyType, Purpose, Urgency
 from app.models.lead import Lead
 from app.services.scoring_service import (
     HOT_THRESHOLD,
@@ -27,6 +20,8 @@ from app.services.scoring_service import (
     calculate_score,
     level_for_score,
 )
+
+PREFIX = "/api/v1"
 
 
 def make_lead(**fields) -> Lead:
@@ -50,12 +45,8 @@ def make_lead(**fields) -> Lead:
     return Lead(**{**defaults, **fields})
 
 
-def interaction(type_: InteractionType) -> Interaction:
-    return Interaction(type=type_, content="（測試用）")
-
-
-def score_of(lead: Lead, interactions: list[Interaction] | None = None) -> int:
-    return calculate_score(lead, interactions or []).score
+def score_of(lead: Lead) -> int:
+    return calculate_score(lead).score
 
 
 def codes_of(result: ScoreResult) -> set[str]:
@@ -71,13 +62,40 @@ def test_same_input_always_gives_same_score():
     LLM 做不到這件事，所以計分才堅持用規則引擎。
     """
     lead = make_lead(location="七期", budget_max=20000000, rooms=3, phone="0912345678")
-    results = {score_of(lead) for _ in range(20)}
 
-    assert len(results) == 1
+    assert len({score_of(lead) for _ in range(20)}) == 1
 
 
 def test_empty_lead_scores_zero():
     assert score_of(make_lead()) == 0
+
+
+# ---------------------------------------------------------------- 只看客戶本身
+
+
+def test_a_brand_new_lead_can_reach_full_marks():
+    """剛填完表單、什麼都還沒發生的客戶，也拿得到 100 分。
+
+    這是刻意的。互動紀錄一度佔 20 分，後來拿掉，因為那對新客戶不公平 ——
+    不管條件多好，那幾分他都是結構性拿不到的，
+    而「拿不到滿分的族群」跟「拿得到的族群」放在一起排序是危險的。
+
+    現在這種客戶（需求清楚、留了電話、很急）會排在最前面 ——
+    正是業務最該立刻打電話的那種人。
+    """
+    fresh = make_lead(
+        phone="0912345678",
+        location="七期",
+        budget_max=20000000,
+        rooms=3,
+        property_type=PropertyType.ELEVATOR_BUILDING,
+        purpose=Purpose.SELF_USE,
+        purchase_timeline=2,
+    )
+    result = calculate_score(fresh)
+
+    assert result.score == 100
+    assert result.level is LeadLevel.HOT
 
 
 # ---------------------------------------------------------------- 預算
@@ -104,53 +122,6 @@ def test_budget_scores_once_even_with_both_bounds():
     assert score_of(single) == score_of(ranged)
 
 
-# ---------------------------------------------------------------- 互動深度
-
-
-def test_viewing_beats_call():
-    """帶看要贏過通話：客戶真的出門看房，比講幾句話真實得多。"""
-    lead = make_lead()
-
-    viewed = score_of(lead, [interaction(InteractionType.VIEWING)])
-    called = score_of(lead, [interaction(InteractionType.CALL)])
-
-    assert viewed > called
-
-
-def test_note_alone_scores_nothing():
-    """只有備註不加分：那是業務寫給自己看的，客戶沒有任何動作。
-
-    這一條是把「有沒有互動紀錄」改成「互動有多深」的核心差別。
-    """
-    lead = make_lead()
-
-    assert score_of(lead, [interaction(InteractionType.NOTE)]) == score_of(lead, [])
-
-
-def test_many_calls_do_not_beat_one_viewing():
-    """互動取最深的一次，不是累加。
-
-    累加的話，打十通沒接的電話會贏過一次帶看 —— 那不合實務。
-    """
-    lead = make_lead()
-
-    ten_calls = score_of(lead, [interaction(InteractionType.CALL) for _ in range(10)])
-    one_viewing = score_of(lead, [interaction(InteractionType.VIEWING)])
-
-    assert one_viewing > ten_calls
-
-
-def test_deepest_interaction_wins_regardless_of_order():
-    lead = make_lead()
-    mixed = [
-        interaction(InteractionType.NOTE),
-        interaction(InteractionType.VIEWING),
-        interaction(InteractionType.CALL),
-    ]
-
-    assert score_of(lead, mixed) == score_of(lead, [interaction(InteractionType.VIEWING)])
-
-
 # ---------------------------------------------------------------- 購買時機
 
 
@@ -164,7 +135,7 @@ def test_urgency_high_counts_even_without_a_month_number():
     urgent = make_lead(urgency=Urgency.HIGH)
 
     assert score_of(urgent) > 0
-    assert "timing_urgent" in codes_of(calculate_score(urgent, []))
+    assert "timing_urgent" in codes_of(calculate_score(urgent))
 
 
 def test_saying_not_urgent_scores_lower_than_saying_nothing():
@@ -189,9 +160,7 @@ def test_over_a_year_is_treated_as_cold():
     一年半、兩年，在業務動作上沒有差別，都是往後排，
     所以不必為了區分它們去雕琢月數的抽取準確度。
     """
-    lead = make_lead(purchase_timeline=18)
-
-    assert "timing_cold" in codes_of(calculate_score(lead, []))
+    assert "timing_cold" in codes_of(calculate_score(make_lead(purchase_timeline=18)))
 
 
 def test_month_number_and_urgency_do_not_double_count():
@@ -218,28 +187,10 @@ def test_score_never_goes_below_zero():
 
     負分讓畫面難讀，而且排序上跟 0 分沒有差別 —— 沒有好處。
     """
-    lead = make_lead(urgency=Urgency.LOW)
-
-    assert score_of(lead) == 0
+    assert score_of(make_lead(urgency=Urgency.LOW)) == 0
 
 
 # ---------------------------------------------------------------- 分級與理由
-
-
-def test_full_information_urgent_lead_is_hot():
-    lead = make_lead(
-        phone="0912345678",
-        location="七期",
-        budget_max=20000000,
-        rooms=3,
-        property_type=PropertyType.ELEVATOR_BUILDING,
-        purpose=Purpose.SELF_USE,
-        purchase_timeline=2,
-    )
-    result = calculate_score(lead, [interaction(InteractionType.VIEWING)])
-
-    assert result.score == 100
-    assert result.level is LeadLevel.HOT
 
 
 @pytest.mark.parametrize(
@@ -277,13 +228,13 @@ def test_reasons_add_up_to_the_score():
         purpose=Purpose.INVESTMENT,
         purchase_timeline=2,
     )
-    result = calculate_score(lead, [interaction(InteractionType.MEETING)])
+    result = calculate_score(lead)
 
     assert sum(r.points for r in result.reasons) == result.score
 
 
 def test_reasons_are_empty_for_an_empty_lead():
-    result = calculate_score(make_lead(), [])
+    result = calculate_score(make_lead())
 
     assert result.reasons == []
     assert result.level is LeadLevel.COLD
@@ -291,10 +242,8 @@ def test_reasons_are_empty_for_an_empty_lead():
 
 # ---------------------------------------------------------------- 真的接上了嗎
 #
-# 上面那些測的是規則本身。這一段測的是「規則有沒有真的被呼叫到」——
+# 上面測的是規則本身。這一段測的是「規則有沒有真的被呼叫到」——
 # 一個算得完全正確、但沒人呼叫的計分引擎，跟沒寫是一樣的。
-
-PREFIX = "/api/v1"
 
 
 def test_score_is_calculated_on_create(client):
@@ -306,58 +255,42 @@ def test_score_is_calculated_on_create(client):
             "location": "七期",
             "budget_max": 20000000,
             "rooms": 3,
+            "purpose": "SELF_USE",
             "purchase_timeline": 2,
         },
     )
 
-    assert resp.json()["lead_score"] > 0
+    # 剛建檔、什麼互動都還沒有的客戶就能拿到滿分 —— 這是刻意的
+    assert resp.json()["lead_score"] == 100
 
 
 def test_score_updates_when_requirements_change(client):
     lead = client.post(f"{PREFIX}/leads", json={"name": "王先生"}).json()
-    before = lead["lead_score"]
 
     after = client.patch(
         f"{PREFIX}/leads/{lead['id']}",
         json={"location": "七期", "budget_max": 20000000},
     ).json()
 
-    assert after["lead_score"] > before
+    assert after["lead_score"] > lead["lead_score"]
 
 
-def test_viewing_raises_the_score_more_than_a_note(client):
-    """互動深度要真的反映在分數上，不是只在單元測試裡成立。"""
-    a = client.post(f"{PREFIX}/leads", json={"name": "甲"}).json()
-    b = client.post(f"{PREFIX}/leads", json={"name": "乙"}).json()
+def test_interactions_do_not_change_the_score(client):
+    """互動不影響 Lead Score —— 這是「分數只看客戶本身」的直接後果。
+
+    「跟進到哪一步」由 Need Follow-up 回答，兩件事分開算。
+    """
+    lead = client.post(
+        f"{PREFIX}/leads", json={"name": "王先生", "location": "七期"}
+    ).json()
 
     client.post(
-        f"{PREFIX}/leads/{a['id']}/interactions",
-        json={"type": "NOTE", "content": "業務自己的備註"},
-    )
-    client.post(
-        f"{PREFIX}/leads/{b['id']}/interactions",
+        f"{PREFIX}/leads/{lead['id']}/interactions",
         json={"type": "VIEWING", "content": "帶看兩間"},
     )
+    after = client.get(f"{PREFIX}/leads/{lead['id']}").json()
 
-    a_after = client.get(f"{PREFIX}/leads/{a['id']}").json()
-    b_after = client.get(f"{PREFIX}/leads/{b['id']}").json()
-
-    assert b_after["lead_score"] > a_after["lead_score"]
-
-
-def test_deleting_the_only_viewing_lowers_the_score(client):
-    """新增要重算，刪除同樣要 —— 少了這一半，分數會停在虛高的位置。"""
-    lead = client.post(f"{PREFIX}/leads", json={"name": "王先生"}).json()
-    created = client.post(
-        f"{PREFIX}/leads/{lead['id']}/interactions",
-        json={"type": "VIEWING", "content": "帶看"},
-    ).json()
-    with_viewing = client.get(f"{PREFIX}/leads/{lead['id']}").json()["lead_score"]
-
-    client.delete(f"{PREFIX}/leads/{lead['id']}/interactions/{created['id']}")
-    after = client.get(f"{PREFIX}/leads/{lead['id']}").json()["lead_score"]
-
-    assert after < with_viewing
+    assert after["lead_score"] == lead["lead_score"]
 
 
 def test_detail_page_explains_the_score(client):

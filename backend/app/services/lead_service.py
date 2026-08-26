@@ -8,6 +8,7 @@ Sprint 5 加入 Lead Scoring 時，呼叫 ScoringService 的位置也在這一�
 """
 
 import logging
+from datetime import date
 
 from sqlalchemy.orm import Session
 
@@ -19,6 +20,7 @@ from app.models.user import User
 from app.repositories.ai_analysis_repository import AIAnalysisRepository
 from app.repositories.lead_repository import LeadRepository
 from app.schemas.lead import LeadCreate, LeadUpdate
+from app.services import follow_up
 from app.services.ai_service import AIService
 from app.services.scoring_service import calculate_score
 
@@ -38,11 +40,11 @@ class LeadService:
 
     def create_lead(self, payload: LeadCreate) -> Lead:
         lead = Lead(**payload.model_dump(), owner_id=self.current_user.id)
-        self._apply_score(lead, [])
+        self._apply_score(lead)
         return self.repo.create(lead)
 
     @staticmethod
-    def _apply_score(lead: Lead, interactions: list) -> None:
+    def _apply_score(lead: Lead) -> None:
         """重算並寫回分數。
 
         分數存在 lead 上（而不是每次查詢時才算），是因為列表頁要用它排序 ——
@@ -51,7 +53,7 @@ class LeadService:
         理由則不存：規則是確定性的，隨時重算得到的結果一定一樣，
         存起來只會多一份可能過期的副本。
         """
-        result = calculate_score(lead, interactions)
+        result = calculate_score(lead)
         lead.lead_score = result.score
         lead.lead_level = result.level
 
@@ -63,11 +65,6 @@ class LeadService:
             # 攻擊者就能靠列舉 id 推測系統裡有多少客戶。
             raise NotFoundError(f"Lead {lead_id} 不存在")
         return lead
-
-    def score_lead(self, lead: Lead) -> Lead:
-        """互動變動後重算分數。給 InteractionService 呼叫。"""
-        self._apply_score(lead, list(lead.interactions))
-        return self.repo.save(lead)
 
     def get_lead_detail(self, lead_id: int) -> Lead:
         """Lead Detail 頁用：一併載入互動紀錄。
@@ -81,7 +78,7 @@ class LeadService:
 
         # 掛一個非資料庫欄位上去給 schema 讀。
         # 理由不存資料庫，所以在這裡即時算出來。
-        lead.score_reasons = calculate_score(lead, list(lead.interactions)).reasons
+        lead.score_reasons = calculate_score(lead).reasons
         return lead
 
     def list_leads(
@@ -108,12 +105,45 @@ class LeadService:
             setattr(lead, field, value)
         # 改了需求欄位，分數就過期了 —— 在同一個地方一起更新，
         # 不要留給呼叫端記得要重算。
-        self._apply_score(lead, list(lead.interactions))
+        self._apply_score(lead)
         return self.repo.save(lead)
 
     def delete_lead(self, lead_id: int) -> None:
         lead = self.get_lead(lead_id)
         self.repo.delete(lead)
+
+    def list_follow_ups(self, today: date | None = None) -> tuple[list, list, int]:
+        """算出今天的待跟進清單。
+
+        判斷在 Python 裡做而不是寫成 SQL：規則有「有沒有互動紀錄」這種
+        跨表的條件，寫成 SQL 會變得很難讀，而且一個業務手上的客戶數
+        是幾百筆的量級，全撈回來判斷完全不是問題。
+
+        真的長到需要在 SQL 裡篩時，next_follow_up_at 已經有索引了。
+        """
+        today = today or date.today()
+        leads = self.repo.list_for_follow_up(self.current_user.id)
+
+        new_uncontacted, due = [], []
+        muted_count = 0
+
+        for lead in leads:
+            status = follow_up.evaluate(lead, list(lead.interactions), today)
+            if status.bucket is follow_up.FollowUpBucket.MUTED:
+                muted_count += 1
+            elif status.bucket is follow_up.FollowUpBucket.NEW_UNCONTACTED:
+                new_uncontacted.append((lead, status))
+            elif status.bucket is follow_up.FollowUpBucket.DUE:
+                due.append((lead, status))
+
+        # 拖越久的排越前面；同樣久的，分數高的優先
+        def priority(item):
+            lead, status = item
+            return (-status.days_overdue, -(lead.lead_score or 0))
+
+        new_uncontacted.sort(key=priority)
+        due.sort(key=priority)
+        return new_uncontacted, due, muted_count
 
     # ------------------------------------------------------------------
     # AI 需求解析（Sprint 3）
@@ -139,7 +169,7 @@ class LeadService:
 
         outcome = self.ai_service.parse_requirement(raw)
         updated_fields = self._apply_requirement(lead, outcome.requirement)
-        self._apply_score(lead, list(lead.interactions))
+        self._apply_score(lead)
 
         analysis = self.analysis_repo.create(
             AIAnalysis(

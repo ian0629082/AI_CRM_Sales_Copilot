@@ -82,6 +82,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/leads/follow-ups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Follow Ups
+         * @description 今天該聯絡誰。
+         *
+         *     路由必須註冊在 /{lead_id} 之前，否則 "follow-ups" 會被當成 lead_id
+         *     去比對，然後回一個看起來莫名其妙的 422。
+         */
+        get: operations["list_follow_ups_api_v1_leads_follow_ups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/leads/{lead_id}": {
         parameters: {
             query?: never;
@@ -215,6 +238,36 @@ export interface components {
              */
             created_at: string;
         };
+        /**
+         * FollowUpItem
+         * @description 待跟進清單上的一列。
+         */
+        FollowUpItem: {
+            lead: components["schemas"]["LeadRead"];
+            /** Bucket */
+            bucket: string;
+            /** Days Overdue */
+            days_overdue: number;
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * FollowUpResponse
+         * @description 待跟進清單，刻意分成兩堆而不是一份排序好的名單。
+         *
+         *     「新進未聯絡」與「到期跟進」對應兩種不同的業務動作：
+         *     一個是第一次接觸（搶時間），一個是維繫（別讓它冷掉）。
+         *     混在一起的話，業務打開看到 20 個人，
+         *     分不出哪些是還沒認識、哪些是快跑掉了。
+         */
+        FollowUpResponse: {
+            /** New Uncontacted */
+            new_uncontacted: components["schemas"]["FollowUpItem"][];
+            /** Due */
+            due: components["schemas"]["FollowUpItem"][];
+            /** Muted Count */
+            muted_count: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -225,6 +278,13 @@ export interface components {
             type: components["schemas"]["InteractionType"];
             /** Content */
             content: string;
+            /** Next Follow Up Days */
+            next_follow_up_days?: number | null;
+            /**
+             * Mute Follow Up
+             * @default false
+             */
+            mute_follow_up: boolean;
         };
         /** InteractionRead */
         InteractionRead: {
@@ -330,6 +390,10 @@ export interface components {
             /** Purchase Timeline */
             purchase_timeline: number | null;
             urgency: components["schemas"]["Urgency"] | null;
+            /** Next Follow Up At */
+            next_follow_up_at: string | null;
+            /** Follow Up Muted */
+            follow_up_muted: boolean;
             /** Lead Score */
             lead_score: number | null;
             lead_level: components["schemas"]["LeadLevel"] | null;
@@ -409,6 +473,10 @@ export interface components {
             /** Purchase Timeline */
             purchase_timeline: number | null;
             urgency: components["schemas"]["Urgency"] | null;
+            /** Next Follow Up At */
+            next_follow_up_at: string | null;
+            /** Follow Up Muted */
+            follow_up_muted: boolean;
             /** Lead Score */
             lead_score: number | null;
             lead_level: components["schemas"]["LeadLevel"] | null;
@@ -471,6 +539,10 @@ export interface components {
             /** Purchase Timeline */
             purchase_timeline?: number | null;
             urgency?: components["schemas"]["Urgency"] | null;
+            /** Next Follow Up At */
+            next_follow_up_at?: string | null;
+            /** Follow Up Muted */
+            follow_up_muted?: boolean | null;
         };
         /**
          * ParsedRequirement
@@ -787,6 +859,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_follow_ups_api_v1_leads_follow_ups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowUpResponse"];
                 };
             };
         };

@@ -6,7 +6,7 @@ Schema 與 Model 刻意分開：
 兩者分開，日後改資料庫欄位才不會直接破壞前端。
 """
 
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
@@ -82,6 +82,10 @@ class LeadUpdate(BaseModel):
     purchase_timeline: int | None = Field(default=None, ge=0, le=120)
     urgency: Urgency | None = None
 
+    # 業務可以隨時直接改提醒日或關掉提醒，不必透過新增互動
+    next_follow_up_at: date | None = None
+    follow_up_muted: bool | None = None
+
 
 class LeadRead(BaseModel):
     """回傳給前端的完整 Lead。"""
@@ -107,6 +111,9 @@ class LeadRead(BaseModel):
     purpose: Purpose | None
     purchase_timeline: int | None
     urgency: Urgency | None
+
+    next_follow_up_at: date | None
+    follow_up_muted: bool
 
     lead_score: int | None
     lead_level: LeadLevel | None
@@ -136,6 +143,32 @@ class LeadListResponse(BaseModel):
 
     items: list[LeadRead]
     total: int
+
+
+class FollowUpItem(BaseModel):
+    """待跟進清單上的一列。"""
+
+    lead: LeadRead
+    bucket: str
+    days_overdue: int
+    reason: str
+
+
+class FollowUpResponse(BaseModel):
+    """待跟進清單，刻意分成兩堆而不是一份排序好的名單。
+
+    「新進未聯絡」與「到期跟進」對應兩種不同的業務動作：
+    一個是第一次接觸（搶時間），一個是維繫（別讓它冷掉）。
+    混在一起的話，業務打開看到 20 個人，
+    分不出哪些是還沒認識、哪些是快跑掉了。
+    """
+
+    new_uncontacted: list[FollowUpItem]
+    due: list[FollowUpItem]
+    # 業務主動關掉提醒的客戶數。
+    # 只給數字不列名單：它不是待辦，但要讓業務知道自己關過幾個，
+    # 不然某天會納悶「那個客戶怎麼再也沒出現過」。
+    muted_count: int
 
 
 class LeadDetail(LeadRead):
