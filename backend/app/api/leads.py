@@ -12,6 +12,8 @@ from app.db.database import get_db
 from app.models.enums import LeadStatus
 from app.models.user import User
 from app.schemas.lead import (
+    FollowUpItem,
+    FollowUpResponse,
     LeadAnalyzeResponse,
     LeadCreate,
     LeadDetail,
@@ -58,6 +60,33 @@ def list_leads(
         status=status_filter, keyword=keyword, skip=skip, limit=limit
     )
     return LeadListResponse(items=items, total=total)
+
+
+@router.get("/follow-ups", response_model=FollowUpResponse)
+def list_follow_ups(service: LeadService = Depends(get_lead_service)):
+    """今天該聯絡誰。
+
+    路由必須註冊在 /{lead_id} 之前，否則 "follow-ups" 會被當成 lead_id
+    去比對，然後回一個看起來莫名其妙的 422。
+    """
+    new_uncontacted, due, muted_count = service.list_follow_ups()
+
+    def to_items(rows):
+        return [
+            FollowUpItem(
+                lead=lead,
+                bucket=status.bucket.value,
+                days_overdue=status.days_overdue,
+                reason=status.reason,
+            )
+            for lead, status in rows
+        ]
+
+    return FollowUpResponse(
+        new_uncontacted=to_items(new_uncontacted),
+        due=to_items(due),
+        muted_count=muted_count,
+    )
 
 
 @router.get("/{lead_id}", response_model=LeadDetail)

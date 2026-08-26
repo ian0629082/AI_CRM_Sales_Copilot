@@ -12,6 +12,7 @@ import type {
   LeadStatus,
   PropertyType,
   Purpose,
+  Urgency,
 } from "@/lib/api/types";
 
 /** Lead Funnel 的順序，列表篩選與 Dashboard 都依這個順序呈現。 */
@@ -75,6 +76,41 @@ export const PROPERTY_TYPE_LABEL: Record<PropertyType, string> = {
   TOWNHOUSE: "透天厝",
   VILLA: "別墅",
   STUDIO: "套房",
+};
+
+/**
+ * 客戶表達出的急迫程度。
+ *
+ * 跟「預計時程」是兩回事：時程是客戶講出來的月數，急迫程度是他的語氣。
+ * 真實客戶很少講「我三個月內要買到」，但常常講「有點急」——
+ * 少了這一欄，那種客戶在 Lead Score 上會被當成沒有時間壓力。
+ */
+export const URGENCY_LABEL: Record<Urgency, string> = {
+  HIGH: "急",
+  LOW: "不急",
+};
+
+export const URGENCY_CLASS: Record<Urgency, string> = {
+  HIGH: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-200",
+  LOW: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+};
+
+/**
+ * 分數的顏色。
+ *
+ * 用等級而不是分數區間決定顏色，這樣改門檻時只要改後端一個地方，
+ * 前端不會偷偷跟後端不同步。
+ */
+export const LEAD_LEVEL_CLASS: Record<LeadLevel, string> = {
+  HOT: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200",
+  WARM: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200",
+  COLD: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+};
+
+/** 待跟進清單的分類標題。兩堆對應兩種不同的業務動作，標題要講得出差別。 */
+export const FOLLOW_UP_BUCKET_LABEL: Record<string, string> = {
+  NEW_UNCONTACTED: "新進未聯絡",
+  DUE: "到期跟進",
 };
 
 export const INTERACTION_TYPE_LABEL: Record<InteractionType, string> = {

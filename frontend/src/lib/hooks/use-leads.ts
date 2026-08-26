@@ -17,6 +17,7 @@ export const leadKeys = {
   all: ["leads"] as const,
   list: (params: LeadListParams) => [...leadKeys.all, "list", params] as const,
   detail: (id: number) => [...leadKeys.all, "detail", id] as const,
+  followUps: () => [...leadKeys.all, "follow-ups"] as const,
 };
 
 export function useLeads(params: LeadListParams = {}) {
@@ -31,6 +32,13 @@ export function useLead(id: number) {
     queryKey: leadKeys.detail(id),
     queryFn: () => leadsApi.getLead(id),
     enabled: Number.isFinite(id) && id > 0,
+  });
+}
+
+export function useFollowUps() {
+  return useQuery({
+    queryKey: leadKeys.followUps(),
+    queryFn: () => leadsApi.listFollowUps(),
   });
 }
 

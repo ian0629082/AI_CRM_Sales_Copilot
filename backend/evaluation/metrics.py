@@ -38,6 +38,7 @@ FIELDS: tuple[str, ...] = (
     "parking",
     "purpose",
     "purchase_timeline",
+    "urgency",
 )
 
 # budget_is_approximate 是 bool，沒有 null。
@@ -154,7 +155,7 @@ class CaseResult:
 
     @property
     def is_exact_match(self) -> bool:
-        """10 個欄位全對。這是最嚴格、也最貼近使用者感受的指標。"""
+        """所有欄位全對。這是最嚴格、也最貼近使用者感受的指標。"""
         return all(o is Outcome.CORRECT for o in self.outcomes.values())
 
     def errors(self) -> dict[str, Outcome]:

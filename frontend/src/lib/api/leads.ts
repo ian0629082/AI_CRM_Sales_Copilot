@@ -1,5 +1,6 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
+  FollowUpResponse,
   Lead,
   LeadAnalyzeResponse,
   LeadCreate,
@@ -30,6 +31,16 @@ function buildQuery(params: LeadListParams): string {
 
 export function listLeads(params: LeadListParams = {}): Promise<LeadListResponse> {
   return apiRequest<LeadListResponse>(`/leads${buildQuery(params)}`);
+}
+
+/**
+ * 今天該聯絡誰。
+ *
+ * 回傳兩份分開的清單而不是一份排序好的名單 ——
+ * 「還沒有人聯絡過」跟「聯絡過但太久沒動」是兩種不同的業務動作。
+ */
+export function listFollowUps(): Promise<FollowUpResponse> {
+  return apiRequest<FollowUpResponse>("/leads/follow-ups");
 }
 
 export function getLead(id: number): Promise<LeadDetail> {

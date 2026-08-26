@@ -82,6 +82,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/leads/follow-ups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Follow Ups
+         * @description 今天該聯絡誰。
+         *
+         *     路由必須註冊在 /{lead_id} 之前，否則 "follow-ups" 會被當成 lead_id
+         *     去比對，然後回一個看起來莫名其妙的 422。
+         */
+        get: operations["list_follow_ups_api_v1_leads_follow_ups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/leads/{lead_id}": {
         parameters: {
             query?: never;
@@ -215,6 +238,36 @@ export interface components {
              */
             created_at: string;
         };
+        /**
+         * FollowUpItem
+         * @description 待跟進清單上的一列。
+         */
+        FollowUpItem: {
+            lead: components["schemas"]["LeadRead"];
+            /** Bucket */
+            bucket: string;
+            /** Days Overdue */
+            days_overdue: number;
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * FollowUpResponse
+         * @description 待跟進清單，刻意分成兩堆而不是一份排序好的名單。
+         *
+         *     「新進未聯絡」與「到期跟進」對應兩種不同的業務動作：
+         *     一個是第一次接觸（搶時間），一個是維繫（別讓它冷掉）。
+         *     混在一起的話，業務打開看到 20 個人，
+         *     分不出哪些是還沒認識、哪些是快跑掉了。
+         */
+        FollowUpResponse: {
+            /** New Uncontacted */
+            new_uncontacted: components["schemas"]["FollowUpItem"][];
+            /** Due */
+            due: components["schemas"]["FollowUpItem"][];
+            /** Muted Count */
+            muted_count: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -225,6 +278,10 @@ export interface components {
             type: components["schemas"]["InteractionType"];
             /** Content */
             content: string;
+            /** Next Follow Up Days */
+            next_follow_up_days?: number | null;
+            /** Mute Follow Up */
+            mute_follow_up?: boolean | null;
         };
         /** InteractionRead */
         InteractionRead: {
@@ -279,6 +336,7 @@ export interface components {
              * @description 預計幾個月內購買
              */
             purchase_timeline?: number | null;
+            urgency?: components["schemas"]["Urgency"] | null;
             /** Name */
             name: string;
             /** Phone */
@@ -328,6 +386,11 @@ export interface components {
             purpose: components["schemas"]["Purpose"] | null;
             /** Purchase Timeline */
             purchase_timeline: number | null;
+            urgency: components["schemas"]["Urgency"] | null;
+            /** Next Follow Up At */
+            next_follow_up_at: string | null;
+            /** Follow Up Muted */
+            follow_up_muted: boolean;
             /** Lead Score */
             lead_score: number | null;
             lead_level: components["schemas"]["LeadLevel"] | null;
@@ -348,6 +411,11 @@ export interface components {
              * @default []
              */
             interactions: components["schemas"]["InteractionRead"][];
+            /**
+             * Score Reasons
+             * @default []
+             */
+            score_reasons: components["schemas"]["ScoreReasonRead"][];
             latest_analysis?: components["schemas"]["AIAnalysisRead"] | null;
         };
         /**
@@ -401,6 +469,11 @@ export interface components {
             purpose: components["schemas"]["Purpose"] | null;
             /** Purchase Timeline */
             purchase_timeline: number | null;
+            urgency: components["schemas"]["Urgency"] | null;
+            /** Next Follow Up At */
+            next_follow_up_at: string | null;
+            /** Follow Up Muted */
+            follow_up_muted: boolean;
             /** Lead Score */
             lead_score: number | null;
             lead_level: components["schemas"]["LeadLevel"] | null;
@@ -462,6 +535,11 @@ export interface components {
             purpose?: components["schemas"]["Purpose"] | null;
             /** Purchase Timeline */
             purchase_timeline?: number | null;
+            urgency?: components["schemas"]["Urgency"] | null;
+            /** Next Follow Up At */
+            next_follow_up_at?: string | null;
+            /** Follow Up Muted */
+            follow_up_muted?: boolean | null;
         };
         /**
          * ParsedRequirement
@@ -503,6 +581,8 @@ export interface components {
              * @description 預計幾個月內購買
              */
             purchase_timeline?: number | null;
+            /** @description 客戶表達出的急迫程度，沒表達就是 None */
+            urgency?: components["schemas"]["Urgency"] | null;
         };
         /**
          * PropertyType
@@ -520,6 +600,22 @@ export interface components {
          * @enum {string}
          */
         Purpose: "SELF_USE" | "INVESTMENT" | "BOTH" | "UNKNOWN";
+        /**
+         * ScoreReasonRead
+         * @description 一條計分理由。
+         *
+         *     這些理由**不存資料庫**，每次讀取時重算。
+         *     因為計分是確定性的規則，同樣的資料一定得到同樣的理由 ——
+         *     存起來只會多一份可能過期的副本。
+         */
+        ScoreReasonRead: {
+            /** Code */
+            code: string;
+            /** Label */
+            label: string;
+            /** Points */
+            points: number;
+        };
         /** Token */
         Token: {
             /** Access Token */
@@ -530,6 +626,26 @@ export interface components {
              */
             token_type: string;
         };
+        /**
+         * Urgency
+         * @description 客戶對「多久要買到」表達出的態度。
+         *
+         *     為什麼不直接用 purchase_timeline 就好？
+         *
+         *     因為真實客戶很少會講「我三個月內要買到房子」。
+         *     他們講的是「我下個月要過去上班，所以有點急」——
+         *     有明確的急迫感，卻沒有任何可以填進 purchase_timeline 的月數。
+         *     只靠月數的話，這種客戶在 Lead Score 上會被當成「沒有時間壓力」，
+         *     排在該優先聯絡的名單後面。
+         *
+         *     這跟 budget_is_approximate 是同一招：不讓 AI 去推算數字，
+         *     而是讓它記錄客戶的語氣，換算與計分交給 Rule Engine。
+         *
+         *     刻意只分兩級加上 null。分越細，AI 判斷錯的機率越高，
+         *     而這一欄本來就比其他欄位主觀。
+         * @enum {string}
+         */
+        Urgency: "HIGH" | "LOW";
         /** UserCreate */
         UserCreate: {
             /** Name */
@@ -740,6 +856,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_follow_ups_api_v1_leads_follow_ups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowUpResponse"];
                 };
             };
         };

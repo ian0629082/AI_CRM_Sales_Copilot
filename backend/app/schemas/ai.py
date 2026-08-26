@@ -16,7 +16,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.models.enums import PropertyType, Purpose
+from app.models.enums import PropertyType, Purpose, Urgency
 
 # 住宅預算的合理上限（10 億台幣）。
 # 這道防線是在擋模型偶爾多打幾個零 —— 「2000 萬」寫成 200 億這種錯誤，
@@ -49,6 +49,9 @@ class ParsedRequirement(BaseModel):
     purpose: Purpose | None = None
     purchase_timeline: int | None = Field(
         default=None, ge=0, le=120, description="預計幾個月內購買"
+    )
+    urgency: Urgency | None = Field(
+        default=None, description="客戶表達出的急迫程度，沒表達就是 None"
     )
 
     @model_validator(mode="after")

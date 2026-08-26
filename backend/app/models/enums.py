@@ -48,6 +48,30 @@ class LeadSource(str, Enum):
     OTHER = "OTHER"
 
 
+class Urgency(str, Enum):
+    """客戶對「多久要買到」表達出的態度。
+
+    為什麼不直接用 purchase_timeline 就好？
+
+    因為真實客戶很少會講「我三個月內要買到房子」。
+    他們講的是「我下個月要過去上班，所以有點急」——
+    有明確的急迫感，卻沒有任何可以填進 purchase_timeline 的月數。
+    只靠月數的話，這種客戶在 Lead Score 上會被當成「沒有時間壓力」，
+    排在該優先聯絡的名單後面。
+
+    這跟 budget_is_approximate 是同一招：不讓 AI 去推算數字，
+    而是讓它記錄客戶的語氣，換算與計分交給 Rule Engine。
+
+    刻意只分兩級加上 null。分越細，AI 判斷錯的機率越高，
+    而這一欄本來就比其他欄位主觀。
+    """
+
+    HIGH = "HIGH"  # 明確表達急迫：有點急、越快越好、這個月、下個月要搬
+    LOW = "LOW"  # 明確表達不急：不急、明年再說、有物件再通知我
+    # 沒有表達任何時間態度時是 null。
+    # 「客戶說不急」與「客戶沒提到」必須分得開 —— 業務對這兩種人的處理方式不同。
+
+
 class PropertyType(str, Enum):
     """房屋類型。
 

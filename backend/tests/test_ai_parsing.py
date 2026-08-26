@@ -36,6 +36,7 @@ EMPTY_RESULT = {
     "parking": None,
     "purpose": None,
     "purchase_timeline": None,
+    "urgency": None,
 }
 
 
@@ -55,6 +56,7 @@ FULL_JSON = _json_with(
     parking=True,
     purpose="SELF_USE",
     purchase_timeline=3,
+    urgency="HIGH",
 )
 
 
@@ -124,6 +126,7 @@ def test_analyze_writes_parsed_fields_back_to_lead(ai_client, fake_llm):
     assert body["lead"]["property_type"] == "ELEVATOR_BUILDING"
     assert body["lead"]["building_age_max"] == 10
     assert body["lead"]["purchase_timeline"] == 3
+    assert body["lead"]["urgency"] == "HIGH"
 
     # 客戶原話是唯一事實來源，任何情況下都不該被解析結果覆蓋
     assert body["lead"]["raw_requirement"] == lead["raw_requirement"]
@@ -137,7 +140,7 @@ def test_analyze_records_metadata_for_later_evaluation(ai_client):
     # prompt_version 與 model 是 Sprint 4 拿來比較「換了之後有沒有比較準」的依據。
     # 這裡刻意寫死版號而不是引用 DEFAULT_PROMPT_VERSION：
     # 改了預設版本就該讓這個測試紅一次，逼人確認「這次改版有跑過評估嗎」。
-    assert analysis["prompt_version"] == "lead_analysis_v2"
+    assert analysis["prompt_version"] == "lead_analysis_v4"
     assert analysis["model"] == "fake-model"
     assert analysis["prompt_tokens"] == 100
     assert analysis["completion_tokens"] == 50
@@ -187,7 +190,7 @@ def test_detail_page_exposes_latest_analysis(ai_client):
     detail = ai_client.get(f"{PREFIX}/leads/{lead['id']}").json()
 
     # 前端靠這個決定要不要掛「AI 解析」徽章，重新整理後徽章才不會消失
-    assert detail["latest_analysis"]["prompt_version"] == "lead_analysis_v2"
+    assert detail["latest_analysis"]["prompt_version"] == "lead_analysis_v4"
 
 
 def test_latest_analysis_is_none_before_any_analysis(ai_client):

@@ -7,6 +7,7 @@
 """
 
 import logging
+from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -17,6 +18,7 @@ from app.models.lead import Lead
 from app.models.user import User
 from app.repositories.interaction_repository import InteractionRepository
 from app.repositories.lead_repository import LeadRepository
+from app.services.follow_up import default_follow_up_days
 from app.schemas.interaction import InteractionCreate
 
 logger = logging.getLogger(__name__)
@@ -44,7 +46,14 @@ class InteractionService:
         lead = self._get_own_lead_or_404(lead_id)
 
         interaction = self.repo.create(
-            Interaction(lead_id=lead_id, **payload.model_dump())
+            Interaction(
+                lead_id=lead_id,
+                # 這兩個是「要怎麼安排提醒」的指令，不是互動紀錄的內容，
+                # 所以不進 Interaction 這張表
+                **payload.model_dump(
+                    exclude={"next_follow_up_days", "mute_follow_up"}
+                ),
+            )
         )
 
         # 只要業務接觸過客戶，這筆 Lead 就不該再停留在 NEW。
@@ -52,10 +61,32 @@ class InteractionService:
         # 已經談到 NEGOTIATING 的客戶，不能因為補記一通電話就被退回 CONTACTED。
         if lead.status == LeadStatus.NEW:
             lead.status = LeadStatus.CONTACTED
-            self.lead_repo.save(lead)
             logger.info("Lead %s 因新增互動，狀態由 NEW 推進為 CONTACTED", lead_id)
 
+        self._schedule_follow_up(lead, payload)
+        self.lead_repo.save(lead)
+
         return interaction
+
+    @staticmethod
+    def _schedule_follow_up(lead: Lead, payload: InteractionCreate) -> None:
+        """設定下次提醒日。
+
+        業務有填就用他填的，沒填就用該互動類型的預設值。
+        規則在這裡只是「建議」，不是「決定」—— 業務永遠可以覆蓋。
+        """
+        if payload.mute_follow_up:
+            lead.follow_up_muted = True
+            lead.next_follow_up_at = None
+            return
+
+        days = payload.next_follow_up_days
+        if days is None:
+            days = default_follow_up_days(payload.type)
+
+        lead.next_follow_up_at = date.today() + timedelta(days=days)
+        # 重新聯絡就等於解除靜音：業務又開始跟這個客戶了
+        lead.follow_up_muted = False
 
     def list_interactions(self, lead_id: int) -> list[Interaction]:
         self._get_own_lead_or_404(lead_id)
