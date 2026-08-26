@@ -20,6 +20,8 @@ AI 驅動的房仲業務 CRM 助手：把客戶的自然語言需求轉成結構
 | 6 | Testing / Logging / Security | ⬜ |
 | 7 | Docker / CI/CD / Deployment | ⬜ |
 
+詳細進度、已定案的設計決策與後續各 Sprint 規劃，見 [docs/PROGRESS.md](docs/PROGRESS.md)。
+
 ## 技術選擇
 
 - **Backend**：Python 3.12 + FastAPI + SQLAlchemy 2.0
