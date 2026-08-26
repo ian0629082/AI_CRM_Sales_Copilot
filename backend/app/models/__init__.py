@@ -12,6 +12,7 @@ from app.models.enums import (
     LeadStatus,
     PropertyType,
     Purpose,
+    Urgency,
 )
 from app.models.interaction import Interaction
 from app.models.lead import Lead
@@ -27,5 +28,6 @@ __all__ = [
     "LeadStatus",
     "PropertyType",
     "Purpose",
+    "Urgency",
     "User",
 ]

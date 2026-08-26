@@ -36,6 +36,8 @@ import {
   LEAD_STATUS_ORDER,
   PROPERTY_TYPE_LABEL,
   PURPOSE_LABEL,
+  URGENCY_CLASS,
+  URGENCY_LABEL,
   formatBudgetRange,
   formatDateTime,
 } from "@/lib/lead-display";
@@ -59,7 +61,8 @@ type RequirementField =
   | "building_age_max"
   | "parking"
   | "purpose"
-  | "purchase_timeline";
+  | "purchase_timeline"
+  | "urgency";
 
 /**
  * 判斷這個欄位目前的值是不是 AI 填的。
@@ -305,6 +308,19 @@ export default function LeadDetailPage() {
                   lead.purchase_timeline ? `${lead.purchase_timeline} 個月內` : null
                 }
                 aiFilled={isAiFilled(lead, "purchase_timeline")}
+              />
+              {/* 急迫程度跟預計時程分開顯示：客戶很少講出明確月數，
+                  卻常常講「有點急」，那個訊號不能被時程欄位的空白蓋掉 */}
+              <Field
+                label="急迫程度"
+                value={
+                  lead.urgency ? (
+                    <Badge variant="secondary" className={URGENCY_CLASS[lead.urgency]}>
+                      {URGENCY_LABEL[lead.urgency]}
+                    </Badge>
+                  ) : null
+                }
+                aiFilled={isAiFilled(lead, "urgency")}
               />
             </CardContent>
           </Card>

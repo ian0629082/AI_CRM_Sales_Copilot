@@ -20,6 +20,7 @@ from app.repositories.ai_analysis_repository import AIAnalysisRepository
 from app.repositories.lead_repository import LeadRepository
 from app.schemas.lead import LeadCreate, LeadUpdate
 from app.services.ai_service import AIService
+from app.services.scoring_service import calculate_score
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +38,22 @@ class LeadService:
 
     def create_lead(self, payload: LeadCreate) -> Lead:
         lead = Lead(**payload.model_dump(), owner_id=self.current_user.id)
+        self._apply_score(lead, [])
         return self.repo.create(lead)
+
+    @staticmethod
+    def _apply_score(lead: Lead, interactions: list) -> None:
+        """重算並寫回分數。
+
+        分數存在 lead 上（而不是每次查詢時才算），是因為列表頁要用它排序 ——
+        排序得在 SQL 裡做，不能把幾百筆撈回來再用 Python 排。
+
+        理由則不存：規則是確定性的，隨時重算得到的結果一定一樣，
+        存起來只會多一份可能過期的副本。
+        """
+        result = calculate_score(lead, interactions)
+        lead.lead_score = result.score
+        lead.lead_level = result.level
 
     def get_lead(self, lead_id: int) -> Lead:
         lead = self.repo.get_for_owner(lead_id, self.current_user.id)
@@ -48,6 +64,11 @@ class LeadService:
             raise NotFoundError(f"Lead {lead_id} 不存在")
         return lead
 
+    def score_lead(self, lead: Lead) -> Lead:
+        """互動變動後重算分數。給 InteractionService 呼叫。"""
+        self._apply_score(lead, list(lead.interactions))
+        return self.repo.save(lead)
+
     def get_lead_detail(self, lead_id: int) -> Lead:
         """Lead Detail 頁用：一併載入互動紀錄。
 
@@ -57,6 +78,10 @@ class LeadService:
         lead = self.repo.get_with_interactions(lead_id, self.current_user.id)
         if lead is None:
             raise NotFoundError(f"Lead {lead_id} 不存在")
+
+        # 掛一個非資料庫欄位上去給 schema 讀。
+        # 理由不存資料庫，所以在這裡即時算出來。
+        lead.score_reasons = calculate_score(lead, list(lead.interactions)).reasons
         return lead
 
     def list_leads(
@@ -81,6 +106,9 @@ class LeadService:
         # 否則 PATCH 會把沒帶到的欄位一律洗成 None。
         for field, value in payload.model_dump(exclude_unset=True).items():
             setattr(lead, field, value)
+        # 改了需求欄位，分數就過期了 —— 在同一個地方一起更新，
+        # 不要留給呼叫端記得要重算。
+        self._apply_score(lead, list(lead.interactions))
         return self.repo.save(lead)
 
     def delete_lead(self, lead_id: int) -> None:
@@ -111,6 +139,7 @@ class LeadService:
 
         outcome = self.ai_service.parse_requirement(raw)
         updated_fields = self._apply_requirement(lead, outcome.requirement)
+        self._apply_score(lead, list(lead.interactions))
 
         analysis = self.analysis_repo.create(
             AIAnalysis(

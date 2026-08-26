@@ -907,6 +907,16 @@
             "title": "Purchase Timeline",
             "description": "預計幾個月內購買"
           },
+          "urgency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Urgency"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "name": {
             "type": "string",
             "maxLength": 100,
@@ -1109,6 +1119,16 @@
             ],
             "title": "Purchase Timeline"
           },
+          "urgency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Urgency"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "lead_score": {
             "anyOf": [
               {
@@ -1152,6 +1172,14 @@
             "title": "Interactions",
             "default": []
           },
+          "score_reasons": {
+            "items": {
+              "$ref": "#/components/schemas/ScoreReasonRead"
+            },
+            "type": "array",
+            "title": "Score Reasons",
+            "default": []
+          },
           "latest_analysis": {
             "anyOf": [
               {
@@ -1182,6 +1210,7 @@
           "parking",
           "purpose",
           "purchase_timeline",
+          "urgency",
           "lead_score",
           "lead_level",
           "owner_id",
@@ -1373,6 +1402,16 @@
             ],
             "title": "Purchase Timeline"
           },
+          "urgency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Urgency"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "lead_score": {
             "anyOf": [
               {
@@ -1428,6 +1467,7 @@
           "parking",
           "purpose",
           "purchase_timeline",
+          "urgency",
           "lead_score",
           "lead_level",
           "owner_id",
@@ -1650,6 +1690,16 @@
               }
             ],
             "title": "Purchase Timeline"
+          },
+          "urgency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Urgency"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -1774,6 +1824,17 @@
             ],
             "title": "Purchase Timeline",
             "description": "預計幾個月內購買"
+          },
+          "urgency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Urgency"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "客戶表達出的急迫程度，沒表達就是 None"
           }
         },
         "type": "object",
@@ -1804,6 +1865,30 @@
         "title": "Purpose",
         "description": "購屋目的。AI 解析自然語言後會填入這個欄位。"
       },
+      "ScoreReasonRead": {
+        "properties": {
+          "code": {
+            "type": "string",
+            "title": "Code"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "points": {
+            "type": "integer",
+            "title": "Points"
+          }
+        },
+        "type": "object",
+        "required": [
+          "code",
+          "label",
+          "points"
+        ],
+        "title": "ScoreReasonRead",
+        "description": "一條計分理由。\n\n這些理由**不存資料庫**，每次讀取時重算。\n因為計分是確定性的規則，同樣的資料一定得到同樣的理由 ——\n存起來只會多一份可能過期的副本。"
+      },
       "Token": {
         "properties": {
           "access_token": {
@@ -1821,6 +1906,15 @@
           "access_token"
         ],
         "title": "Token"
+      },
+      "Urgency": {
+        "type": "string",
+        "enum": [
+          "HIGH",
+          "LOW"
+        ],
+        "title": "Urgency",
+        "description": "客戶對「多久要買到」表達出的態度。\n\n為什麼不直接用 purchase_timeline 就好？\n\n因為真實客戶很少會講「我三個月內要買到房子」。\n他們講的是「我下個月要過去上班，所以有點急」——\n有明確的急迫感，卻沒有任何可以填進 purchase_timeline 的月數。\n只靠月數的話，這種客戶在 Lead Score 上會被當成「沒有時間壓力」，\n排在該優先聯絡的名單後面。\n\n這跟 budget_is_approximate 是同一招：不讓 AI 去推算數字，\n而是讓它記錄客戶的語氣，換算與計分交給 Rule Engine。\n\n刻意只分兩級加上 null。分越細，AI 判斷錯的機率越高，\n而這一欄本來就比其他欄位主觀。"
       },
       "UserCreate": {
         "properties": {

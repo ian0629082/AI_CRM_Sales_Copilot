@@ -15,7 +15,14 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
-from app.models.enums import LeadLevel, LeadSource, LeadStatus, PropertyType, Purpose
+from app.models.enums import (
+    LeadLevel,
+    LeadSource,
+    LeadStatus,
+    PropertyType,
+    Purpose,
+    Urgency,
+)
 
 
 class Lead(Base):
@@ -73,6 +80,11 @@ class Lead(Base):
     )
     purchase_timeline: Mapped[int | None] = mapped_column(
         Integer, comment="預計幾個月內購買"
+    )
+    # 客戶表達出的急迫程度。真實客戶很少講明確月數，卻常常講「有點急」，
+    # 少了這一欄，那種客戶在 Lead Score 上會被當成沒有時間壓力。
+    urgency: Mapped[Urgency | None] = mapped_column(
+        SAEnum(Urgency, native_enum=False, length=10)
     )
 
     # --- Rule Engine 計算（Sprint 5）---

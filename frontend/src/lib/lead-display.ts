@@ -12,6 +12,7 @@ import type {
   LeadStatus,
   PropertyType,
   Purpose,
+  Urgency,
 } from "@/lib/api/types";
 
 /** Lead Funnel 的順序，列表篩選與 Dashboard 都依這個順序呈現。 */
@@ -75,6 +76,23 @@ export const PROPERTY_TYPE_LABEL: Record<PropertyType, string> = {
   TOWNHOUSE: "透天厝",
   VILLA: "別墅",
   STUDIO: "套房",
+};
+
+/**
+ * 客戶表達出的急迫程度。
+ *
+ * 跟「預計時程」是兩回事：時程是客戶講出來的月數，急迫程度是他的語氣。
+ * 真實客戶很少講「我三個月內要買到」，但常常講「有點急」——
+ * 少了這一欄，那種客戶在 Lead Score 上會被當成沒有時間壓力。
+ */
+export const URGENCY_LABEL: Record<Urgency, string> = {
+  HIGH: "急",
+  LOW: "不急",
+};
+
+export const URGENCY_CLASS: Record<Urgency, string> = {
+  HIGH: "bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-200",
+  LOW: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
 };
 
 export const INTERACTION_TYPE_LABEL: Record<InteractionType, string> = {

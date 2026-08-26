@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from pydantic import ValidationError as PydanticValidationError
 
 from app.core.exceptions import AIServiceError
-from app.models.enums import PropertyType, Purpose
+from app.models.enums import PropertyType, Purpose, Urgency
 from app.schemas.ai import ParsedRequirement
 from app.services.llm_provider import LLMError, LLMProvider
 
@@ -36,8 +36,7 @@ logger = logging.getLogger(__name__)
 # 也查得出它是哪一版 prompt 產生的。
 PROMPT_V1 = "lead_analysis_v1"
 PROMPT_V2 = "lead_analysis_v2"
-
-DEFAULT_PROMPT_VERSION = PROMPT_V2
+# PROMPT_V3 定義在 SYSTEM_PROMPT_V3 之後（它是由 v2 的內容延伸出來的）
 
 SYSTEM_PROMPT_V1 = """你是台灣房仲公司的資料整理助理。
 你的工作是把業務記下的客戶原話，整理成結構化欄位。
@@ -170,9 +169,100 @@ SYSTEM_PROMPT_V2 = """你是台灣房仲公司的資料整理助理。
   客戶說「七期」就填 "七期"，說「台中七期」就填 "台中七期"
 """
 
+# v3 新增 urgency 欄位。
+#
+# 動機不是「v2 有哪裡不準」，而是 Sprint 5 的 Lead Scoring 發現訊號不夠用：
+# purchase_timeline 需要明確月數才填得進去，但真實客戶很少那樣講話。
+# 具業務實務經驗的人出的 15 題裡，明確月數 0 筆 —— 也就是說
+# 「3 個月內購買 +20」這條計分規則在真實資料上幾乎不會觸發。
+#
+# 這是「Scoring 的需求反過來定義了 AI 該抽什麼」，而不是先抽一堆欄位
+# 再想能拿來做什麼。規劃書那句「不要先做 Agent，再想 Agent 可以做什麼」
+# 講的是同一件事。
+SYSTEM_PROMPT_V3 = (
+    SYSTEM_PROMPT_V2.rstrip()
+    + """
+
+【急迫程度 urgency】客戶對「多久要買到」表達出的態度
+- HIGH：明確表達急迫或有時間壓力
+  「有點急」「越快越好」「盡快」「這個月就想看」「下個月要搬過去」
+  「三個月內要交屋」，或有外部事件逼著他短期內必須解決住的問題
+- LOW：明確表達不急
+  「不急」「明年再說」「有物件再通知我」「看到好的再介紹」「兩年內都可以」
+- null：完全沒有表達時間態度
+
+這一欄看的是**語氣**，跟客戶有沒有講出月數是兩回事：
+「我下個月要過去上班，所以有點急」→ purchase_timeline=null（沒說幾個月要買到），
+但 urgency=HIGH（他明確說了急）。兩欄都要填，不要因為填了一個就略過另一個。
+
+半年、一年這種中等期程，若客戶沒有表達急或不急的態度，urgency 就填 null。
+"""
+)
+
+PROMPT_V3 = "lead_analysis_v3"
+
+# v4 只改 urgency 那一段。
+#
+# v3 在開發集上 urgency 的 Recall 只有 54.5%，錯誤全是「漏抽」（捏造 0 筆）。
+# 看錯誤模式，是同一個病的兩種表現：
+#
+#   A) 「三個月內想成交」→ 填了 purchase_timeline=3，urgency 卻留空。
+#      模型把兩欄當成互斥，雖然 v3 已經寫了「兩欄都要填」。
+#   B) 「還在考慮，之後再聊」「明年上半年」→ 這些字沒出現在我列的詞彙裡，就不填。
+#
+# 根源是 v3 給的是**詞彙表**，模型就只認那幾個詞，不推廣。
+# 這跟 v2 漏掉「一年半」是同一個問題 —— 這個模型照著列舉作答的傾向很強。
+#
+# 所以 v4 改成給**判斷準則**（客戶是不是表現出時間壓力），詞彙只當例子。
+SYSTEM_PROMPT_V4 = SYSTEM_PROMPT_V3.replace(
+    """【急迫程度 urgency】客戶對「多久要買到」表達出的態度
+- HIGH：明確表達急迫或有時間壓力
+  「有點急」「越快越好」「盡快」「這個月就想看」「下個月要搬過去」
+  「三個月內要交屋」，或有外部事件逼著他短期內必須解決住的問題
+- LOW：明確表達不急
+  「不急」「明年再說」「有物件再通知我」「看到好的再介紹」「兩年內都可以」
+- null：完全沒有表達時間態度
+
+這一欄看的是**語氣**，跟客戶有沒有講出月數是兩回事：
+「我下個月要過去上班，所以有點急」→ purchase_timeline=null（沒說幾個月要買到），
+但 urgency=HIGH（他明確說了急）。兩欄都要填，不要因為填了一個就略過另一個。
+
+半年、一年這種中等期程，若客戶沒有表達急或不急的態度，urgency 就填 null。
+""",
+    """【急迫程度 urgency】客戶有沒有表現出時間壓力
+判斷準則（不是詞彙比對，符合精神就算）：
+
+- HIGH，符合任一即可：
+  1. 用了表達急迫的說法（例：有點急、越快越好、盡快）
+  2. 講出三個月以內的期程（例：這個月、兩個月內、三個月內想成交）
+  3. 有外部事件逼著他在短期內必須解決住的問題
+     （例：下個月要過去上班、房子被收回、小孩開學前要搬）
+
+- LOW，符合任一即可：
+  1. 明說不急（例：不急、不趕）
+  2. 把決定往後推（例：再看看、之後再聊、回來再約、有物件再通知我、還在考慮）
+  3. 講出一年以上、或指向明年的期程（例：明年再說、明年上半年、兩年內都可以）
+
+- null：完全看不出他對時間的態度。
+  半年、一年這種中等期程，若沒有其他急或不急的訊號，就填 null。
+
+**這一欄跟 purchase_timeline 是各自獨立的，兩欄都要判斷一次。**
+- 「三個月內想成交」→ purchase_timeline=3 **而且** urgency=HIGH
+  （填了月數不代表 urgency 就該留空）
+- 「下個月要過去上班，所以有點急」→ purchase_timeline=null（他沒說幾個月要買到）
+  **而且** urgency=HIGH（他明確說了急）
+""",
+)
+
+PROMPT_V4 = "lead_analysis_v4"
+
+DEFAULT_PROMPT_VERSION = PROMPT_V4
+
 PROMPTS: dict[str, str] = {
     PROMPT_V1: SYSTEM_PROMPT_V1,
     PROMPT_V2: SYSTEM_PROMPT_V2,
+    PROMPT_V3: SYSTEM_PROMPT_V3,
+    PROMPT_V4: SYSTEM_PROMPT_V4,
 }
 
 
@@ -184,42 +274,53 @@ def _nullable(*types: str) -> list[str]:
 # OpenAI 的 strict 模式對 schema 有額外要求（每個欄位都必須出現在 required、
 # 不能有 default、additionalProperties 必須是 false），
 # 自動生成的結果常常差一點點就被拒絕，反而更難查。寫死在這裡最清楚。
-REQUIREMENT_JSON_SCHEMA = {
-    "type": "object",
-    "additionalProperties": False,
-    "properties": {
-        "location": {"type": _nullable("string")},
-        "budget_min": {"type": _nullable("integer")},
-        "budget_max": {"type": _nullable("integer")},
-        "budget_is_approximate": {"type": "boolean"},
-        "rooms": {"type": _nullable("integer")},
-        "property_type": {
-            "type": _nullable("string"),
-            "enum": [*(t.value for t in PropertyType), None],
-        },
-        "building_age_max": {"type": _nullable("integer")},
-        "parking": {"type": _nullable("boolean")},
-        "purpose": {
-            "type": _nullable("string"),
-            "enum": [*(p.value for p in Purpose), None],
-        },
-        "purchase_timeline": {"type": _nullable("integer")},
+_ALL_PROPERTIES = {
+    "location": {"type": _nullable("string")},
+    "budget_min": {"type": _nullable("integer")},
+    "budget_max": {"type": _nullable("integer")},
+    "budget_is_approximate": {"type": "boolean"},
+    "rooms": {"type": _nullable("integer")},
+    "property_type": {
+        "type": _nullable("string"),
+        "enum": [*(t.value for t in PropertyType), None],
     },
-    # strict 模式要求「所有欄位都必須列在 required」。
-    # 這不代表值不能是 null —— 而是模型不准偷偷少回一個欄位。
-    "required": [
-        "location",
-        "budget_min",
-        "budget_max",
-        "budget_is_approximate",
-        "rooms",
-        "property_type",
-        "building_age_max",
-        "parking",
-        "purchase_timeline",
-        "purpose",
-    ],
+    "building_age_max": {"type": _nullable("integer")},
+    "parking": {"type": _nullable("boolean")},
+    "purpose": {
+        "type": _nullable("string"),
+        "enum": [*(p.value for p in Purpose), None],
+    },
+    "purchase_timeline": {"type": _nullable("integer")},
+    "urgency": {
+        "type": _nullable("string"),
+        "enum": [*(u.value for u in Urgency), None],
+    },
 }
+
+# urgency 是 v3 才有的欄位。
+#
+# schema 必須跟著 prompt 版號走，否則「留著舊版是為了能重跑對照」
+# 這件事就破功了：拿新 schema 去跑 v1，模型會被逼著回一個
+# prompt 裡從沒說明過的欄位，那已經不是當初的 v1 了。
+FIELDS_BY_VERSION: dict[str, tuple[str, ...]] = {
+    PROMPT_V1: tuple(f for f in _ALL_PROPERTIES if f != "urgency"),
+    PROMPT_V2: tuple(f for f in _ALL_PROPERTIES if f != "urgency"),
+    PROMPT_V3: tuple(_ALL_PROPERTIES),
+    PROMPT_V4: tuple(_ALL_PROPERTIES),
+}
+
+
+def build_json_schema(prompt_version: str) -> dict:
+    """組出這個 prompt 版本對應的 strict schema。"""
+    fields = FIELDS_BY_VERSION[prompt_version]
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {name: _ALL_PROPERTIES[name] for name in fields},
+        # strict 模式要求「所有欄位都必須列在 required」。
+        # 這不代表值不能是 null —— 而是模型不准偷偷少回一個欄位。
+        "required": list(fields),
+    }
 
 
 @dataclass(frozen=True)
@@ -246,6 +347,7 @@ class AIService:
         if prompt_version not in PROMPTS:
             raise ValueError(f"未知的 prompt 版本：{prompt_version}")
         self.prompt_version = prompt_version
+        self.json_schema = build_json_schema(prompt_version)
 
     def parse_requirement(self, raw_requirement: str) -> ParseOutcome:
         started = time.perf_counter()
@@ -255,7 +357,7 @@ class AIService:
                 system_prompt=PROMPTS[self.prompt_version],
                 user_prompt=f"客戶原話：\n{raw_requirement}",
                 schema_name="lead_requirement",
-                json_schema=REQUIREMENT_JSON_SCHEMA,
+                json_schema=self.json_schema,
             )
         except LLMError as exc:
             # 在這裡把「模型層的錯」翻譯成「應用層的錯」。

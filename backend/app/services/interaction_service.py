@@ -17,6 +17,7 @@ from app.models.lead import Lead
 from app.models.user import User
 from app.repositories.interaction_repository import InteractionRepository
 from app.repositories.lead_repository import LeadRepository
+from app.services.scoring_service import calculate_score
 from app.schemas.interaction import InteractionCreate
 
 logger = logging.getLogger(__name__)
@@ -52,17 +53,26 @@ class InteractionService:
         # 已經談到 NEGOTIATING 的客戶，不能因為補記一通電話就被退回 CONTACTED。
         if lead.status == LeadStatus.NEW:
             lead.status = LeadStatus.CONTACTED
-            self.lead_repo.save(lead)
             logger.info("Lead %s 因新增互動，狀態由 NEW 推進為 CONTACTED", lead_id)
 
+        # 互動深度會影響分數（帶看比通話重），所以新增互動後要重算。
+        # 放在 Service 層，n8n 或 Agent 日後新增互動時也會走到同一段。
+        self._rescore(lead)
+
         return interaction
+
+    def _rescore(self, lead: Lead) -> None:
+        result = calculate_score(lead, list(lead.interactions))
+        lead.lead_score = result.score
+        lead.lead_level = result.level
+        self.lead_repo.save(lead)
 
     def list_interactions(self, lead_id: int) -> list[Interaction]:
         self._get_own_lead_or_404(lead_id)
         return self.repo.list_by_lead(lead_id)
 
     def delete_interaction(self, lead_id: int, interaction_id: int) -> None:
-        self._get_own_lead_or_404(lead_id)
+        lead = self._get_own_lead_or_404(lead_id)
 
         interaction = self.repo.get(interaction_id)
         # 檢查 lead_id 是否相符，避免透過 A 客戶的網址刪掉 B 客戶的紀錄
@@ -70,3 +80,5 @@ class InteractionService:
             raise NotFoundError(f"Lead {lead_id} 底下沒有 Interaction {interaction_id}")
 
         self.repo.delete(interaction)
+        # 刪掉唯一一次帶看，分數就該掉下來 —— 新增要重算，刪除同樣要
+        self._rescore(lead)

@@ -31,3 +31,4 @@ export type LeadSource = Schemas["LeadSource"];
 export type InteractionType = Schemas["InteractionType"];
 export type Purpose = Schemas["Purpose"];
 export type PropertyType = Schemas["PropertyType"];
+export type Urgency = Schemas["Urgency"];

@@ -23,6 +23,7 @@ FIELD_LABEL = {
     "parking": "車位 parking",
     "purpose": "購屋目的",
     "purchase_timeline": "購屋時程",
+    "urgency": "急迫程度",
 }
 
 OUTCOME_LABEL = {
@@ -85,11 +86,11 @@ def render_markdown(report: Report, *, dataset_name: str, dataset_version: str) 
     add("|---|---|---|")
     add(
         f"| 欄位正確率 | **{_pct(report.field_accuracy)}** "
-        f"| {len(report.cases)} 筆 × 10 個欄位攤平之後的整體正確率 |"
+        f"| {len(report.cases)} 筆 × {len(FIELDS)} 個欄位攤平之後的整體正確率 |"
     )
     add(
         f"| 完全正確率 | **{_pct(report.exact_match_rate)}** "
-        "| 10 個欄位全對的案例比例，最嚴格也最貼近使用者感受 |"
+        f"| {len(FIELDS)} 個欄位全對的案例比例，最嚴格也最貼近使用者感受 |"
     )
     add(
         f"| 捏造率 | **{_pct(report.hallucination_rate)}** "

@@ -54,7 +54,7 @@
 - 開發集 40 筆 + **held-out 驗證集 21 筆**，Ground Truth 全人工標註
 - 評估腳本可切換模型與 prompt 版本，逐欄位計算正確率、Recall、Precision、捏造率
 - Error Analysis 指出 v1 的錯誤 78% 集中在 `location` → 據此寫出 prompt v2
-- **驗證集成績：欄位正確率 99.5%、完全正確率 95.2%、捏造率 0%**
+- **驗證集成績：欄位正確率 99.6%、完全正確率 95.2%、捏造率 0%**（v4，11 個欄位）
 - 模型比較結論：gpt-5.4-mini 是甜蜜點，換 gpt-5.4 買不到準確率
 - 完整結果見 [docs/evaluation/README.md](evaluation/README.md)
 - 後端測試 106 個
@@ -68,7 +68,7 @@
 | 分支 | `main` / `develop` / `feature/*`，皆已推送 |
 | OpenAI API Key | 已填入 `backend/.env` |
 | LLM 型號 | `gpt-5.4-mini`（環境變數 `OPENAI_MODEL`，換型號不必改程式碼） |
-| Prompt 版本 | `lead_analysis_v2`（v1 保留在程式碼中，供評估比較用） |
+| Prompt 版本 | `lead_analysis_v4`（v1～v3 全部保留在程式碼中，供評估比較用） |
 | Docker | 尚未安裝（Sprint 7 才需要） |
 | Demo 帳號 | `demo@example.com` / `demo1234`，Neon 上有測試資料 |
 

@@ -10,7 +10,14 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
-from app.models.enums import LeadLevel, LeadSource, LeadStatus, PropertyType, Purpose
+from app.models.enums import (
+    LeadLevel,
+    LeadSource,
+    LeadStatus,
+    PropertyType,
+    Purpose,
+    Urgency,
+)
 from app.schemas.ai import AIAnalysisRead
 from app.schemas.interaction import InteractionRead
 
@@ -32,6 +39,7 @@ class LeadRequirementFields(BaseModel):
     purchase_timeline: int | None = Field(
         default=None, ge=0, le=120, description="預計幾個月內購買"
     )
+    urgency: Urgency | None = None
 
     @model_validator(mode="after")
     def check_budget_range(self):
@@ -72,6 +80,7 @@ class LeadUpdate(BaseModel):
     parking: bool | None = None
     purpose: Purpose | None = None
     purchase_timeline: int | None = Field(default=None, ge=0, le=120)
+    urgency: Urgency | None = None
 
 
 class LeadRead(BaseModel):
@@ -97,6 +106,7 @@ class LeadRead(BaseModel):
     parking: bool | None
     purpose: Purpose | None
     purchase_timeline: int | None
+    urgency: Urgency | None
 
     lead_score: int | None
     lead_level: LeadLevel | None
@@ -104,6 +114,21 @@ class LeadRead(BaseModel):
     owner_id: int
     created_at: datetime
     updated_at: datetime
+
+
+class ScoreReasonRead(BaseModel):
+    """一條計分理由。
+
+    這些理由**不存資料庫**，每次讀取時重算。
+    因為計分是確定性的規則，同樣的資料一定得到同樣的理由 ——
+    存起來只會多一份可能過期的副本。
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    label: str
+    points: int
 
 
 class LeadListResponse(BaseModel):
@@ -121,6 +146,10 @@ class LeadDetail(LeadRead):
     """
 
     interactions: list[InteractionRead] = []
+    # 分數是怎麼來的，逐條列出。
+    # 「可解釋」不是加分項，是這套 Scoring 敢拿來排序的前提 ——
+    # 一個講不出理由的分數，沒有業務會照著它打電話。
+    score_reasons: list[ScoreReasonRead] = []
     # 最近一次 AI 解析。前端靠它決定哪些欄位要掛「AI 解析」徽章，
     # 重新整理頁面後徽章也還在（不是只存在前端記憶體裡的狀態）。
     latest_analysis: AIAnalysisRead | None = None

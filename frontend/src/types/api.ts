@@ -279,6 +279,7 @@ export interface components {
              * @description 預計幾個月內購買
              */
             purchase_timeline?: number | null;
+            urgency?: components["schemas"]["Urgency"] | null;
             /** Name */
             name: string;
             /** Phone */
@@ -328,6 +329,7 @@ export interface components {
             purpose: components["schemas"]["Purpose"] | null;
             /** Purchase Timeline */
             purchase_timeline: number | null;
+            urgency: components["schemas"]["Urgency"] | null;
             /** Lead Score */
             lead_score: number | null;
             lead_level: components["schemas"]["LeadLevel"] | null;
@@ -348,6 +350,11 @@ export interface components {
              * @default []
              */
             interactions: components["schemas"]["InteractionRead"][];
+            /**
+             * Score Reasons
+             * @default []
+             */
+            score_reasons: components["schemas"]["ScoreReasonRead"][];
             latest_analysis?: components["schemas"]["AIAnalysisRead"] | null;
         };
         /**
@@ -401,6 +408,7 @@ export interface components {
             purpose: components["schemas"]["Purpose"] | null;
             /** Purchase Timeline */
             purchase_timeline: number | null;
+            urgency: components["schemas"]["Urgency"] | null;
             /** Lead Score */
             lead_score: number | null;
             lead_level: components["schemas"]["LeadLevel"] | null;
@@ -462,6 +470,7 @@ export interface components {
             purpose?: components["schemas"]["Purpose"] | null;
             /** Purchase Timeline */
             purchase_timeline?: number | null;
+            urgency?: components["schemas"]["Urgency"] | null;
         };
         /**
          * ParsedRequirement
@@ -503,6 +512,8 @@ export interface components {
              * @description 預計幾個月內購買
              */
             purchase_timeline?: number | null;
+            /** @description 客戶表達出的急迫程度，沒表達就是 None */
+            urgency?: components["schemas"]["Urgency"] | null;
         };
         /**
          * PropertyType
@@ -520,6 +531,22 @@ export interface components {
          * @enum {string}
          */
         Purpose: "SELF_USE" | "INVESTMENT" | "BOTH" | "UNKNOWN";
+        /**
+         * ScoreReasonRead
+         * @description 一條計分理由。
+         *
+         *     這些理由**不存資料庫**，每次讀取時重算。
+         *     因為計分是確定性的規則，同樣的資料一定得到同樣的理由 ——
+         *     存起來只會多一份可能過期的副本。
+         */
+        ScoreReasonRead: {
+            /** Code */
+            code: string;
+            /** Label */
+            label: string;
+            /** Points */
+            points: number;
+        };
         /** Token */
         Token: {
             /** Access Token */
@@ -530,6 +557,26 @@ export interface components {
              */
             token_type: string;
         };
+        /**
+         * Urgency
+         * @description 客戶對「多久要買到」表達出的態度。
+         *
+         *     為什麼不直接用 purchase_timeline 就好？
+         *
+         *     因為真實客戶很少會講「我三個月內要買到房子」。
+         *     他們講的是「我下個月要過去上班，所以有點急」——
+         *     有明確的急迫感，卻沒有任何可以填進 purchase_timeline 的月數。
+         *     只靠月數的話，這種客戶在 Lead Score 上會被當成「沒有時間壓力」，
+         *     排在該優先聯絡的名單後面。
+         *
+         *     這跟 budget_is_approximate 是同一招：不讓 AI 去推算數字，
+         *     而是讓它記錄客戶的語氣，換算與計分交給 Rule Engine。
+         *
+         *     刻意只分兩級加上 null。分越細，AI 判斷錯的機率越高，
+         *     而這一欄本來就比其他欄位主觀。
+         * @enum {string}
+         */
+        Urgency: "HIGH" | "LOW";
         /** UserCreate */
         UserCreate: {
             /** Name */

@@ -108,17 +108,22 @@ def test_always_answering_false_does_not_inflate_recall():
 
 
 def test_field_accuracy_counts_every_field_of_every_case():
-    """一筆全對、一筆錯一個欄位 → 20 個欄位裡對 19 個。"""
+    """一筆全對、一筆錯一個欄位 → 兩筆的欄位總數裡只錯一個。
+
+    分母用 len(FIELDS) 推導而不是寫死數字：
+    日後再加欄位時，這個測試該驗的性質沒變，不該因為算術而紅。
+    """
     cases = [
         _case("case-1", _expected(location="七期"), _expected(location="七期")),
         _case("case-2", _expected(location="信義區"), _expected(location="大安區")),
     ]
     report = build_report(model="m", prompt_version="v", cases=cases)
 
-    assert report.field_accuracy == pytest.approx(19 / 20)
+    total = 2 * len(FIELDS)
+    assert report.field_accuracy == pytest.approx((total - 1) / total)
 
 
-def test_exact_match_rate_requires_all_ten_fields():
+def test_exact_match_rate_requires_every_field():
     """完全正確率是最嚴格的指標：錯一個欄位，整筆就不算對。"""
     cases = [
         _case("case-1", _expected(rooms=3), _expected(rooms=3)),
@@ -135,12 +140,13 @@ def test_hallucination_rate_is_measured_against_empty_fields_only():
     用全部欄位當分母會把這個數字稀釋掉：
     客戶講了很多的案例會讓捏造率看起來變低，但模型的行為根本沒變。
     """
-    # 客戶只講了房數，其餘 9 個欄位是空的；模型多生了一個 location
+    # 客戶只講了房數，其餘欄位都是空的；模型多生了一個 location
     case = _case("case-1", _expected(rooms=3), _expected(rooms=3, location="七期"))
     report = build_report(model="m", prompt_version="v", cases=[case])
 
-    # 9 個空欄位中捏造了 1 個
-    assert report.hallucination_rate == pytest.approx(1 / 9)
+    # 分母是「空欄位數」（總欄位減掉有值的 rooms），不是全部欄位
+    empty_fields = len(FIELDS) - 1
+    assert report.hallucination_rate == pytest.approx(1 / empty_fields)
 
 
 def test_precision_and_recall_are_none_when_there_is_nothing_to_measure():
@@ -216,7 +222,7 @@ def _load(filename: str) -> dict:
 
 @pytest.mark.parametrize("filename", DATASET_FILES)
 def test_dataset_is_well_formed(filename):
-    """資料集的每一筆都要有完整的 10 個欄位標註。
+    """資料集的每一筆都要有 FIELDS 裡的每一個欄位標註。
 
     少標一個欄位不會讓程式壞掉，只會讓那個欄位被當成 null 靜靜地算進統計，
     然後產出一個沒人發現是錯的準確率。所以這裡要擋住。

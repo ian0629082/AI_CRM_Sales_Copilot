@@ -23,7 +23,10 @@ def test_create_lead_minimal(client: TestClient):
     data = resp.json()
     assert data["name"] == "王小明"
     assert data["status"] == "NEW"  # 新客戶預設進入漏斗第一關
-    assert data["lead_score"] is None  # Scoring 是 Sprint 5 的事
+    # 只有姓名的客戶什麼訊號都沒有，0 分。
+    # 是 0 不是 null —— null 代表「還沒算」，0 代表「算過了，就是沒分」。
+    assert data["lead_score"] == 0
+    assert data["lead_level"] == "COLD"
     assert data["id"] > 0
 
 
