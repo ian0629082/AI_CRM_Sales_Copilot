@@ -1,0 +1,1773 @@
+{
+  "model": "gpt-5.4-mini",
+  "prompt_version": "lead_analysis_v1",
+  "dataset": "dev",
+  "dataset_version": "v1",
+  "cases": [
+    {
+      "case_id": "case-001",
+      "raw_requirement": "想在七期找三房電梯大樓，預算 2000 萬左右，要有車位，屋齡 10 年內，三個月內想成交，自住",
+      "tags": [
+        "full",
+        "budget_approximate"
+      ],
+      "expected": {
+        "location": "七期",
+        "budget_min": null,
+        "budget_max": 20000000,
+        "budget_is_approximate": true,
+        "rooms": 3,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": 10,
+        "parking": true,
+        "purpose": "SELF_USE",
+        "purchase_timeline": 3
+      },
+      "actual": {
+        "location": "七期",
+        "budget_min": null,
+        "budget_max": 20000000,
+        "budget_is_approximate": true,
+        "rooms": 3,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": 10,
+        "parking": true,
+        "purpose": "SELF_USE",
+        "purchase_timeline": 3
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-002",
+      "raw_requirement": "客戶說預算 2000 萬，信義區，三房",
+      "tags": [
+        "budget_exact"
+      ],
+      "expected": {
+        "location": "信義區",
+        "budget_min": null,
+        "budget_max": 20000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "信義區",
+        "budget_min": null,
+        "budget_max": 20000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-003",
+      "raw_requirement": "1500 到 2000 萬，公寓也可以，屋齡 10 年內，自住",
+      "tags": [
+        "budget_range",
+        "property_type"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": 15000000,
+        "budget_max": 20000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "APARTMENT",
+        "building_age_max": 10,
+        "parking": null,
+        "purpose": "SELF_USE",
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": null,
+        "budget_min": 15000000,
+        "budget_max": 20000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "APARTMENT",
+        "building_age_max": 10,
+        "parking": null,
+        "purpose": "SELF_USE",
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-004",
+      "raw_requirement": "三、四房都可以，不急，明年再說",
+      "tags": [
+        "rooms_range",
+        "timeline_vague"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-005",
+      "raw_requirement": "預算 2000 萬不能超過，信義區電梯大樓，收租用",
+      "tags": [
+        "budget_exact",
+        "purpose"
+      ],
+      "expected": {
+        "location": "信義區",
+        "budget_min": null,
+        "budget_max": 20000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "INVESTMENT",
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "信義區",
+        "budget_min": null,
+        "budget_max": 20000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "INVESTMENT",
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-006",
+      "raw_requirement": "想買新成屋，不要太舊，兩房就好",
+      "tags": [
+        "age_no_number"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": 2,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": 2,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-007",
+      "raw_requirement": "板橋這邊有沒有透天？預算抓 3000 萬上下，自己住",
+      "tags": [
+        "budget_approximate",
+        "property_type"
+      ],
+      "expected": {
+        "location": "板橋",
+        "budget_min": null,
+        "budget_max": 30000000,
+        "budget_is_approximate": true,
+        "rooms": null,
+        "property_type": "TOWNHOUSE",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "SELF_USE",
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "板橋",
+        "budget_min": null,
+        "budget_max": 30000000,
+        "budget_is_approximate": true,
+        "rooms": null,
+        "property_type": "TOWNHOUSE",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "SELF_USE",
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-008",
+      "raw_requirement": "客戶要找套房，投資收租，總價 800 萬以內，捷運附近",
+      "tags": [
+        "property_type",
+        "location_distractor"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 8000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "STUDIO",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "INVESTMENT",
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "捷運附近",
+        "budget_min": null,
+        "budget_max": 8000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "STUDIO",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "INVESTMENT",
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "HALLUCINATION",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-009",
+      "raw_requirement": "內湖四房，屋齡 5 年內，一定要有車位，半年內要買",
+      "tags": [
+        "age_number",
+        "timeline_number",
+        "no_budget"
+      ],
+      "expected": {
+        "location": "內湖",
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": 4,
+        "property_type": null,
+        "building_age_max": 5,
+        "parking": true,
+        "purpose": null,
+        "purchase_timeline": 6
+      },
+      "actual": {
+        "location": "內湖",
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": 4,
+        "property_type": null,
+        "building_age_max": 5,
+        "parking": true,
+        "purpose": null,
+        "purchase_timeline": 6
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-010",
+      "raw_requirement": "預算兩千三百萬，找華廈，中山區",
+      "tags": [
+        "budget_chinese_numeral",
+        "property_type"
+      ],
+      "expected": {
+        "location": "中山區",
+        "budget_min": null,
+        "budget_max": 23000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "LOW_RISE",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "中山區",
+        "budget_min": null,
+        "budget_max": 23000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "LOW_RISE",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-011",
+      "raw_requirement": "別墅有沒有？預算 6000 萬，一年內，自住兼投資",
+      "tags": [
+        "property_type",
+        "purpose_both",
+        "timeline_number"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 60000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "VILLA",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "BOTH",
+        "purchase_timeline": 12
+      },
+      "actual": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 60000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "VILLA",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "BOTH",
+        "purchase_timeline": 12
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-012",
+      "raw_requirement": "客戶還在考慮，之後再聊",
+      "tags": [
+        "all_null"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-013",
+      "raw_requirement": "上次那間開價 2500 萬他覺得太貴，預算大概 2000 萬",
+      "tags": [
+        "budget_approximate",
+        "budget_distractor"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 20000000,
+        "budget_is_approximate": true,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 20000000,
+        "budget_is_approximate": true,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-014",
+      "raw_requirement": "三重，兩房以上，1200 萬左右，不用車位",
+      "tags": [
+        "rooms_range",
+        "budget_approximate",
+        "parking_false"
+      ],
+      "expected": {
+        "location": "三重",
+        "budget_min": null,
+        "budget_max": 12000000,
+        "budget_is_approximate": true,
+        "rooms": 2,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": false,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "三重",
+        "budget_min": null,
+        "budget_max": 12000000,
+        "budget_is_approximate": true,
+        "rooms": 2,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": false,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-015",
+      "raw_requirement": "屋齡不限，只要三房有車位，中和，預算 1800 萬",
+      "tags": [
+        "age_no_number",
+        "parking_true"
+      ],
+      "expected": {
+        "location": "中和",
+        "budget_min": null,
+        "budget_max": 18000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": true,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "中和",
+        "budget_min": null,
+        "budget_max": 18000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": true,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-016",
+      "raw_requirement": "這個月就想看房，預算 2500 萬，大樓，兩房",
+      "tags": [
+        "timeline_number",
+        "property_type"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 25000000,
+        "budget_is_approximate": false,
+        "rooms": 2,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": 1
+      },
+      "actual": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 25000000,
+        "budget_is_approximate": false,
+        "rooms": 2,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": 1
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-017",
+      "raw_requirement": "農曆年前想成交，信義區三房，預算 3000 萬",
+      "tags": [
+        "timeline_vague"
+      ],
+      "expected": {
+        "location": "信義區",
+        "budget_min": null,
+        "budget_max": 30000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "信義區",
+        "budget_min": null,
+        "budget_max": 30000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-018",
+      "raw_requirement": "越快越好，預算 1000 萬到 1500 萬，公寓可以接受",
+      "tags": [
+        "budget_range",
+        "timeline_vague",
+        "property_type"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": 10000000,
+        "budget_max": 15000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "APARTMENT",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": null,
+        "budget_min": 10000000,
+        "budget_max": 15000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "APARTMENT",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-019",
+      "raw_requirement": "淡水海景兩房，投資用，預算 900 萬左右",
+      "tags": [
+        "budget_approximate",
+        "purpose"
+      ],
+      "expected": {
+        "location": "淡水",
+        "budget_min": null,
+        "budget_max": 9000000,
+        "budget_is_approximate": true,
+        "rooms": 2,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "INVESTMENT",
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "淡水海景",
+        "budget_min": null,
+        "budget_max": 9000000,
+        "budget_is_approximate": true,
+        "rooms": 2,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "INVESTMENT",
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "WRONG",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-020",
+      "raw_requirement": "新莊副都心，電梯大樓，三房兩廳，車位要平面的，預算 2200 萬",
+      "tags": [
+        "location_specific",
+        "parking_true"
+      ],
+      "expected": {
+        "location": "新莊副都心",
+        "budget_min": null,
+        "budget_max": 22000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": null,
+        "parking": true,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "新莊副都心",
+        "budget_min": null,
+        "budget_max": 22000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": null,
+        "parking": true,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-021",
+      "raw_requirement": "客戶是換屋族，小孩要念書，想找四房，學區附近，預算 3500 萬以內，明年上半年",
+      "tags": [
+        "purpose_implied",
+        "location_distractor",
+        "timeline_vague"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 35000000,
+        "budget_is_approximate": false,
+        "rooms": 4,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "SELF_USE",
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "學區附近",
+        "budget_min": null,
+        "budget_max": 35000000,
+        "budget_is_approximate": false,
+        "rooms": 4,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "HALLUCINATION",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "MISS",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-022",
+      "raw_requirement": "屋齡 15 年以內的華廈，桃園藝文特區，預算 1600 萬，三個月內",
+      "tags": [
+        "age_number",
+        "property_type",
+        "timeline_number"
+      ],
+      "expected": {
+        "location": "桃園藝文特區",
+        "budget_min": null,
+        "budget_max": 16000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "LOW_RISE",
+        "building_age_max": 15,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": 3
+      },
+      "actual": {
+        "location": "桃園藝文特區",
+        "budget_min": null,
+        "budget_max": 16000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "LOW_RISE",
+        "building_age_max": 15,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": 3
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-023",
+      "raw_requirement": "中古屋也可以，預算 1100 萬到 1300 萬，兩房，永和",
+      "tags": [
+        "age_no_number",
+        "budget_range"
+      ],
+      "expected": {
+        "location": "永和",
+        "budget_min": 11000000,
+        "budget_max": 13000000,
+        "budget_is_approximate": false,
+        "rooms": 2,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "永和",
+        "budget_min": 11000000,
+        "budget_max": 13000000,
+        "budget_is_approximate": false,
+        "rooms": 2,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-024",
+      "raw_requirement": "有車位最好，沒有也沒關係，三房，預算 2000 萬",
+      "tags": [
+        "parking_preference"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 20000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": true,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 20000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": true,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-025",
+      "raw_requirement": "預算頂多 1800 萬，公寓，五樓以下",
+      "tags": [
+        "budget_exact",
+        "property_type"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 18000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "APARTMENT",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 18000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "APARTMENT",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-026",
+      "raw_requirement": "台中七期豪宅，8000 萬左右，自住，要兩個車位",
+      "tags": [
+        "location_original",
+        "budget_approximate"
+      ],
+      "expected": {
+        "location": "台中七期",
+        "budget_min": null,
+        "budget_max": 80000000,
+        "budget_is_approximate": true,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": true,
+        "purpose": "SELF_USE",
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "七期",
+        "budget_min": null,
+        "budget_max": 80000000,
+        "budget_is_approximate": true,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": true,
+        "purpose": "SELF_USE",
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "WRONG",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-027",
+      "raw_requirement": "想找電梯大樓，屋齡十年內，三房，預算 2000 萬到 2500 萬，半年內，自住",
+      "tags": [
+        "full",
+        "budget_range",
+        "age_chinese_numeral"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": 20000000,
+        "budget_max": 25000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": 10,
+        "parking": null,
+        "purpose": "SELF_USE",
+        "purchase_timeline": 6
+      },
+      "actual": {
+        "location": null,
+        "budget_min": 20000000,
+        "budget_max": 25000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": 10,
+        "parking": null,
+        "purpose": "SELF_USE",
+        "purchase_timeline": 6
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-028",
+      "raw_requirement": "客戶問有沒有便宜的物件，沒說預算",
+      "tags": [
+        "all_null",
+        "budget_distractor"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-029",
+      "raw_requirement": "南港三房，預算 2500 萬到 2800 萬，兩年內都可以",
+      "tags": [
+        "budget_range",
+        "timeline_number"
+      ],
+      "expected": {
+        "location": "南港",
+        "budget_min": 25000000,
+        "budget_max": 28000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": 24
+      },
+      "actual": {
+        "location": "南港",
+        "budget_min": 25000000,
+        "budget_max": 28000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": 24
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-030",
+      "raw_requirement": "投資客，想買套房收租，一次買兩間，預算各 600 萬",
+      "tags": [
+        "property_type",
+        "purpose",
+        "budget_distractor"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 6000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "STUDIO",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "INVESTMENT",
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 6000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "STUDIO",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "INVESTMENT",
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-031",
+      "raw_requirement": "板橋江子翠，四房透天，預算 4500 萬，屋齡 20 年內可以",
+      "tags": [
+        "location_specific",
+        "property_type",
+        "age_number"
+      ],
+      "expected": {
+        "location": "板橋江子翠",
+        "budget_min": null,
+        "budget_max": 45000000,
+        "budget_is_approximate": false,
+        "rooms": 4,
+        "property_type": "TOWNHOUSE",
+        "building_age_max": 20,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "板橋江子翠",
+        "budget_min": null,
+        "budget_max": 45000000,
+        "budget_is_approximate": false,
+        "rooms": 4,
+        "property_type": "TOWNHOUSE",
+        "building_age_max": 20,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-032",
+      "raw_requirement": "只要有車位，其他都好談，預算 2000 萬左右",
+      "tags": [
+        "parking_true",
+        "budget_approximate"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 20000000,
+        "budget_is_approximate": true,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": true,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 20000000,
+        "budget_is_approximate": true,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": true,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-033",
+      "raw_requirement": "不要公寓，要有電梯，三房，士林，預算 3000 萬",
+      "tags": [
+        "property_type_ambiguous"
+      ],
+      "expected": {
+        "location": "士林",
+        "budget_min": null,
+        "budget_max": 30000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "士林",
+        "budget_min": null,
+        "budget_max": 30000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "HALLUCINATION",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-034",
+      "raw_requirement": "預算 5000 萬左右，別墅，郊區也可以，自住",
+      "tags": [
+        "budget_approximate",
+        "property_type",
+        "location_distractor"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 50000000,
+        "budget_is_approximate": true,
+        "rooms": null,
+        "property_type": "VILLA",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "SELF_USE",
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "郊區",
+        "budget_min": null,
+        "budget_max": 50000000,
+        "budget_is_approximate": true,
+        "rooms": null,
+        "property_type": "VILLA",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "SELF_USE",
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "HALLUCINATION",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-035",
+      "raw_requirement": "三個月內要交屋，兩房，不用車位，預算 1200 萬到 1500 萬",
+      "tags": [
+        "budget_range",
+        "parking_false",
+        "timeline_number"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": 12000000,
+        "budget_max": 15000000,
+        "budget_is_approximate": false,
+        "rooms": 2,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": false,
+        "purpose": null,
+        "purchase_timeline": 3
+      },
+      "actual": {
+        "location": null,
+        "budget_min": 12000000,
+        "budget_max": 15000000,
+        "budget_is_approximate": false,
+        "rooms": 2,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": false,
+        "purpose": null,
+        "purchase_timeline": 3
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-036",
+      "raw_requirement": "客戶今天來店裡，說想看看信義區的房子",
+      "tags": [
+        "sparse"
+      ],
+      "expected": {
+        "location": "信義區",
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "信義區",
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-037",
+      "raw_requirement": "預算 1 億，帝寶那種等級的，自住",
+      "tags": [
+        "budget_unit",
+        "location_distractor"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 100000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "SELF_USE",
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 100000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "SELF_USE",
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-038",
+      "raw_requirement": "屋齡 3 年內的新古屋，兩房，內湖或南港，預算 2200 萬",
+      "tags": [
+        "age_number",
+        "location_multiple"
+      ],
+      "expected": {
+        "location": "內湖",
+        "budget_min": null,
+        "budget_max": 22000000,
+        "budget_is_approximate": false,
+        "rooms": 2,
+        "property_type": null,
+        "building_age_max": 3,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": "內湖或南港",
+        "budget_min": null,
+        "budget_max": 22000000,
+        "budget_is_approximate": false,
+        "rooms": 2,
+        "property_type": null,
+        "building_age_max": 3,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "WRONG",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-039",
+      "raw_requirement": "先生說不急，明年小孩畢業再說，預算大概 2000 萬，三房",
+      "tags": [
+        "timeline_vague",
+        "budget_approximate"
+      ],
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 20000000,
+        "budget_is_approximate": true,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "actual": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": 20000000,
+        "budget_is_approximate": true,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null
+      },
+      "outcomes": {
+        "location": "CORRECT",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    },
+    {
+      "case_id": "case-040",
+      "raw_requirement": "要三房兩衛，有車位，屋齡 10 年內，預算 2600 萬，三個月內，自住，中和或永和",
+      "tags": [
+        "full",
+        "location_multiple"
+      ],
+      "expected": {
+        "location": "中和",
+        "budget_min": null,
+        "budget_max": 26000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": 10,
+        "parking": true,
+        "purpose": "SELF_USE",
+        "purchase_timeline": 3
+      },
+      "actual": {
+        "location": "中和或永和",
+        "budget_min": null,
+        "budget_max": 26000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": 10,
+        "parking": true,
+        "purpose": "SELF_USE",
+        "purchase_timeline": 3
+      },
+      "outcomes": {
+        "location": "WRONG",
+        "budget_min": "CORRECT",
+        "budget_max": "CORRECT",
+        "budget_is_approximate": "CORRECT",
+        "rooms": "CORRECT",
+        "property_type": "CORRECT",
+        "building_age_max": "CORRECT",
+        "parking": "CORRECT",
+        "purpose": "CORRECT",
+        "purchase_timeline": "CORRECT"
+      }
+    }
+  ],
+  "failures": []
+}
