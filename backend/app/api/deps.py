@@ -4,15 +4,23 @@ get_current_user 是整個授權機制的入口：
 任何需要登入才能用的 API，只要加上 Depends(get_current_user) 即可。
 """
 
+import logging
+from functools import lru_cache
+
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.exceptions import UnauthorizedError
 from app.core.security import decode_access_token
 from app.db.database import get_db
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
+from app.services.ai_service import AIService
+from app.services.llm_provider import LLMError, OpenAIProvider
+
+logger = logging.getLogger(__name__)
 
 # auto_error=False：由我們自己丟 UnauthorizedError，
 # 讓所有錯誤回應都經過 main.py 的 handler，維持一致的 {"detail": ...} 格式。
@@ -41,3 +49,30 @@ def get_current_user(
         raise UnauthorizedError("使用者不存在")
 
     return user
+
+
+@lru_cache(maxsize=1)
+def get_ai_service() -> AIService | None:
+    """建立 AIService，沒有設定 API key 時回傳 None。
+
+    用 lru_cache 快取：OpenAI client 內含 HTTP 連線池，
+    每個請求都 new 一個會浪費掉連線重用，也拖慢每次分析。
+
+    回傳 None 而不是丟錯誤，是為了守住「AI 是 Enhancement」這條線 ——
+    沒設 key 的環境（例如 CI）仍然要能跑起整個 CRM，只是那顆按鈕會回 503。
+    """
+    if not settings.OPENAI_API_KEY:
+        logger.warning("未設定 OPENAI_API_KEY，AI 解析功能停用")
+        return None
+
+    try:
+        provider = OpenAIProvider(
+            api_key=settings.OPENAI_API_KEY,
+            model=settings.OPENAI_MODEL,
+            timeout=settings.OPENAI_TIMEOUT_SECONDS,
+        )
+    except LLMError:
+        logger.exception("建立 OpenAI provider 失敗，AI 解析功能停用")
+        return None
+
+    return AIService(provider)

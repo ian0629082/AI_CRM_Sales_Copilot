@@ -10,6 +10,7 @@ import type {
   LeadLevel,
   LeadSource,
   LeadStatus,
+  PropertyType,
   Purpose,
 } from "@/lib/api/types";
 
@@ -67,6 +68,15 @@ export const PURPOSE_LABEL: Record<Purpose, string> = {
   UNKNOWN: "未確定",
 };
 
+export const PROPERTY_TYPE_LABEL: Record<PropertyType, string> = {
+  ELEVATOR_BUILDING: "電梯大樓",
+  LOW_RISE: "華廈",
+  APARTMENT: "公寓",
+  TOWNHOUSE: "透天厝",
+  VILLA: "別墅",
+  STUDIO: "套房",
+};
+
 export const INTERACTION_TYPE_LABEL: Record<InteractionType, string> = {
   CALL: "電話",
   LINE: "LINE",
@@ -88,18 +98,27 @@ export function formatBudget(amount: number | null | undefined): string {
   return `${wan.toLocaleString("zh-TW", { maximumFractionDigits: 0 })} 萬`;
 }
 
-/** 預算區間。只有下限或只有上限時也要能正確顯示。 */
+/**
+ * 預算區間。只有下限或只有上限時也要能正確顯示。
+ *
+ * isApproximate 為 true 時前面加「約」：客戶說的是「2000 萬左右」，
+ * 畫面就不該顯示得像是一個精確數字。真正的 5% 搜尋緩衝由後端的
+ * Rule Engine 計算，這裡只負責誠實呈現客戶原本的語氣。
+ */
 export function formatBudgetRange(
   min: number | null | undefined,
   max: number | null | undefined,
+  isApproximate = false,
 ): string {
+  const prefix = isApproximate ? "約 " : "";
+
   if (min === null || min === undefined) {
     if (max === null || max === undefined) return "—";
-    return `${formatBudget(max)} 以下`;
+    return `${prefix}${formatBudget(max)} 以下`;
   }
-  if (max === null || max === undefined) return `${formatBudget(min)} 以上`;
-  if (min === max) return formatBudget(min);
-  return `${formatBudget(min)} ~ ${formatBudget(max)}`;
+  if (max === null || max === undefined) return `${prefix}${formatBudget(min)} 以上`;
+  if (min === max) return `${prefix}${formatBudget(min)}`;
+  return `${prefix}${formatBudget(min)} ~ ${formatBudget(max)}`;
 }
 
 /** 後端回傳 UTC 時間，這裡轉成本地時區顯示。 */

@@ -104,6 +104,35 @@ export interface paths {
         patch: operations["update_lead_api_v1_leads__lead_id__patch"];
         trace?: never;
     };
+    "/api/v1/leads/{lead_id}/analyze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Analyze Lead
+         * @description 把客戶原話交給 AI 解析，結果直接寫回這位客戶的需求欄位。
+         *
+         *     同步等待（約 2～5 秒），前端顯示 loading。
+         *     做成同步是因為 MVP 階段一次只分析一筆，排背景工作要多一個 queue 與輪詢機制，
+         *     複雜度換不到對應的好處；真的要批次分析時再改。
+         *
+         *     可能的失敗：
+         *     - 404 這位客戶不存在（或不是你的）
+         *     - 422 這位客戶還沒填原始需求
+         *     - 503 AI 暫時不可用 —— 客戶資料本身不受影響，前端顯示重試按鈕
+         */
+        post: operations["analyze_lead_api_v1_leads__lead_id__analyze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/leads/{lead_id}/interactions": {
         parameters: {
             query?: never;
@@ -160,6 +189,32 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AIAnalysisRead
+         * @description 一次 AI 分析的紀錄，回給前端用來顯示「AI 解析」徽章與分析時間。
+         */
+        AIAnalysisRead: {
+            /** Id */
+            id: number;
+            /** Analysis Type */
+            analysis_type: string;
+            parsed_result: components["schemas"]["ParsedRequirement"] | null;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Model */
+            model: string;
+            /** Prompt Tokens */
+            prompt_tokens: number | null;
+            /** Completion Tokens */
+            completion_tokens: number | null;
+            /** Latency Ms */
+            latency_ms: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -192,6 +247,17 @@ export interface components {
          * @enum {string}
          */
         InteractionType: "CALL" | "LINE" | "EMAIL" | "MEETING" | "VIEWING" | "NOTE";
+        /**
+         * LeadAnalyzeResponse
+         * @description POST /leads/{id}/analyze 的回應。
+         *
+         *     一併回傳更新後的 lead，前端就不必再打一次 GET —— 少一次來回，
+         *     也少一次「畫面上還是舊資料」的機會。
+         */
+        LeadAnalyzeResponse: {
+            lead: components["schemas"]["LeadRead"];
+            analysis: components["schemas"]["AIAnalysisRead"];
+        };
         /** LeadCreate */
         LeadCreate: {
             /** Location */
@@ -202,6 +268,9 @@ export interface components {
             budget_max?: number | null;
             /** Rooms */
             rooms?: number | null;
+            property_type?: components["schemas"]["PropertyType"] | null;
+            /** Building Age Max */
+            building_age_max?: number | null;
             /** Parking */
             parking?: boolean | null;
             purpose?: components["schemas"]["Purpose"] | null;
@@ -247,8 +316,13 @@ export interface components {
             budget_min: number | null;
             /** Budget Max */
             budget_max: number | null;
+            /** Budget Is Approximate */
+            budget_is_approximate: boolean;
             /** Rooms */
             rooms: number | null;
+            property_type: components["schemas"]["PropertyType"] | null;
+            /** Building Age Max */
+            building_age_max: number | null;
             /** Parking */
             parking: boolean | null;
             purpose: components["schemas"]["Purpose"] | null;
@@ -274,6 +348,7 @@ export interface components {
              * @default []
              */
             interactions: components["schemas"]["InteractionRead"][];
+            latest_analysis?: components["schemas"]["AIAnalysisRead"] | null;
         };
         /**
          * LeadLevel
@@ -314,8 +389,13 @@ export interface components {
             budget_min: number | null;
             /** Budget Max */
             budget_max: number | null;
+            /** Budget Is Approximate */
+            budget_is_approximate: boolean;
             /** Rooms */
             rooms: number | null;
+            property_type: components["schemas"]["PropertyType"] | null;
+            /** Building Age Max */
+            building_age_max: number | null;
             /** Parking */
             parking: boolean | null;
             purpose: components["schemas"]["Purpose"] | null;
@@ -370,14 +450,70 @@ export interface components {
             budget_min?: number | null;
             /** Budget Max */
             budget_max?: number | null;
+            /** Budget Is Approximate */
+            budget_is_approximate?: boolean | null;
             /** Rooms */
             rooms?: number | null;
+            property_type?: components["schemas"]["PropertyType"] | null;
+            /** Building Age Max */
+            building_age_max?: number | null;
             /** Parking */
             parking?: boolean | null;
             purpose?: components["schemas"]["Purpose"] | null;
             /** Purchase Timeline */
             purchase_timeline?: number | null;
         };
+        /**
+         * ParsedRequirement
+         * @description AI 從客戶原話抽取出的結構化需求。
+         *
+         *     每個欄位都可以是 None，而且 None 有明確意義：**客戶沒提到**。
+         *     這是刻意的設計。抽取規則裡最重要的兩條原則是「不推算」與「不補全」：
+         *     客戶說「不急」，purchase_timeline 就是 None，不能猜成 6 個月。
+         */
+        ParsedRequirement: {
+            /**
+             * Location
+             * @description 客戶提到的區域，保留原話
+             */
+            location?: string | null;
+            /** Budget Min */
+            budget_min?: number | null;
+            /** Budget Max */
+            budget_max?: number | null;
+            /**
+             * Budget Is Approximate
+             * @description 客戶說的是概數（2000 萬左右）還是精確數字
+             * @default false
+             */
+            budget_is_approximate: boolean;
+            /** Rooms */
+            rooms?: number | null;
+            property_type?: components["schemas"]["PropertyType"] | null;
+            /**
+             * Building Age Max
+             * @description 可接受的屋齡上限（年）
+             */
+            building_age_max?: number | null;
+            /** Parking */
+            parking?: boolean | null;
+            purpose?: components["schemas"]["Purpose"] | null;
+            /**
+             * Purchase Timeline
+             * @description 預計幾個月內購買
+             */
+            purchase_timeline?: number | null;
+        };
+        /**
+         * PropertyType
+         * @description 房屋類型。
+         *
+         *     只收這六類，是因為 AI 的輸出必須落在可列舉的集合裡：
+         *     若允許自由字串，「電梯大樓」「大樓」「電梯華廈」會變成三個不同的值，
+         *     Sprint 4 算準確率時就無法比對，日後要做物件搜尋也沒辦法下條件。
+         * @enum {string}
+         */
+        PropertyType: "ELEVATOR_BUILDING" | "LOW_RISE" | "APARTMENT" | "TOWNHOUSE" | "VILLA" | "STUDIO";
         /**
          * Purpose
          * @description 購屋目的。AI 解析自然語言後會填入這個欄位。
@@ -690,6 +826,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LeadRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    analyze_lead_api_v1_leads__lead_id__analyze_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lead_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadAnalyzeResponse"];
                 };
             };
             /** @description Validation Error */

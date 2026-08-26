@@ -15,6 +15,11 @@ bcrypt==5.0.0
 # timing attack 弱點（CVE-2024-23342）。FastAPI 官方文件現也改用 PyJWT。
 PyJWT==2.10.1
 
+# AI（Sprint 3）
+# 只在 LLMProvider 這一層用到，其他程式碼一律不直接 import openai，
+# 日後換供應商時要改的範圍才控制得住。
+openai==2.6.1
+
 # Testing
 pytest==8.3.4
 httpx==0.28.1

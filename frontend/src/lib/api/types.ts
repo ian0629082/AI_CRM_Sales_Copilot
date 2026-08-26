@@ -16,6 +16,9 @@ export type LeadCreate = Schemas["LeadCreate"];
 export type LeadUpdate = Schemas["LeadUpdate"];
 export type LeadListResponse = Schemas["LeadListResponse"];
 
+export type AIAnalysis = Schemas["AIAnalysisRead"];
+export type LeadAnalyzeResponse = Schemas["LeadAnalyzeResponse"];
+
 export type Interaction = Schemas["InteractionRead"];
 export type InteractionCreate = Schemas["InteractionCreate"];
 
@@ -27,3 +30,4 @@ export type LeadLevel = Schemas["LeadLevel"];
 export type LeadSource = Schemas["LeadSource"];
 export type InteractionType = Schemas["InteractionType"];
 export type Purpose = Schemas["Purpose"];
+export type PropertyType = Schemas["PropertyType"];

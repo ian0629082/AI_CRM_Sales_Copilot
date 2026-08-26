@@ -28,8 +28,13 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 
-    # Sprint 3 才會用到
+    # --- AI（Sprint 3）---
     OPENAI_API_KEY: str = ""
+    # 型號寫成環境變數而不是寫死在程式裡：換模型不必改一行程式碼，
+    # Sprint 4 的 Evaluation 也能直接跑兩個模型比較準確率與成本。
+    OPENAI_MODEL: str = "gpt-5.4-mini"
+    # 同步等待的 API 一定要設逾時，否則 OpenAI 卡住時會把後端的連線一起卡死。
+    OPENAI_TIMEOUT_SECONDS: float = 30.0
 
     @field_validator("JWT_SECRET")
     @classmethod

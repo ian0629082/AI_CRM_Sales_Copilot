@@ -29,7 +29,10 @@ class LeadRepository:
         stmt = (
             select(Lead)
             .where(Lead.id == lead_id, Lead.owner_id == owner_id)
-            .options(selectinload(Lead.interactions))
+            .options(
+                selectinload(Lead.interactions),
+                selectinload(Lead.ai_analyses),
+            )
         )
         return self.db.execute(stmt).scalar_one_or_none()
 

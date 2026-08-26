@@ -34,3 +34,24 @@ class UnauthorizedError(AppError):
 class ForbiddenError(AppError):
     status_code = 403
     message = "沒有權限執行此操作"
+
+
+class ValidationError(AppError):
+    """輸入不符合商業規則（例如要分析卻沒有客戶原話）。"""
+
+    status_code = 422
+    message = "資料不符合要求"
+
+
+class AIServiceError(AppError):
+    """AI 分析失敗。
+
+    刻意用 503 而不是 500：這代表「外部服務暫時不可用，等一下再試」，
+    而不是「我們的程式壞了」。前端可以據此顯示重試按鈕。
+
+    最重要的是，這個錯誤絕不能牽連 CRM 本身 —— AI 掛掉時，
+    客戶資料的增刪改查、互動紀錄、登入都必須照常運作。
+    """
+
+    status_code = 503
+    message = "AI 分析目前無法完成，請稍後再試"

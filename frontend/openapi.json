@@ -397,6 +397,54 @@
         }
       }
     },
+    "/api/v1/leads/{lead_id}/analyze": {
+      "post": {
+        "tags": [
+          "leads"
+        ],
+        "summary": "Analyze Lead",
+        "description": "把客戶原話交給 AI 解析，結果直接寫回這位客戶的需求欄位。\n\n同步等待（約 2～5 秒），前端顯示 loading。\n做成同步是因為 MVP 階段一次只分析一筆，排背景工作要多一個 queue 與輪詢機制，\n複雜度換不到對應的好處；真的要批次分析時再改。\n\n可能的失敗：\n- 404 這位客戶不存在（或不是你的）\n- 422 這位客戶還沒填原始需求\n- 503 AI 暫時不可用 —— 客戶資料本身不受影響，前端顯示重試按鈕",
+        "operationId": "analyze_lead_api_v1_leads__lead_id__analyze_post",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "lead_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Lead Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeadAnalyzeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/leads/{lead_id}/interactions": {
       "post": {
         "tags": [
@@ -574,6 +622,88 @@
   },
   "components": {
     "schemas": {
+      "AIAnalysisRead": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "analysis_type": {
+            "type": "string",
+            "title": "Analysis Type"
+          },
+          "parsed_result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ParsedRequirement"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "prompt_version": {
+            "type": "string",
+            "title": "Prompt Version"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model"
+          },
+          "prompt_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prompt Tokens"
+          },
+          "completion_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Completion Tokens"
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latency Ms"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "analysis_type",
+          "parsed_result",
+          "prompt_version",
+          "model",
+          "prompt_tokens",
+          "completion_tokens",
+          "latency_ms",
+          "created_at"
+        ],
+        "title": "AIAnalysisRead",
+        "description": "一次 AI 分析的紀錄，回給前端用來顯示「AI 解析」徽章與分析時間。"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -651,6 +781,23 @@
         "title": "InteractionType",
         "description": "業務與客戶的互動管道。"
       },
+      "LeadAnalyzeResponse": {
+        "properties": {
+          "lead": {
+            "$ref": "#/components/schemas/LeadRead"
+          },
+          "analysis": {
+            "$ref": "#/components/schemas/AIAnalysisRead"
+          }
+        },
+        "type": "object",
+        "required": [
+          "lead",
+          "analysis"
+        ],
+        "title": "LeadAnalyzeResponse",
+        "description": "POST /leads/{id}/analyze 的回應。\n\n一併回傳更新後的 lead，前端就不必再打一次 GET —— 少一次來回，\n也少一次「畫面上還是舊資料」的機會。"
+      },
       "LeadCreate": {
         "properties": {
           "location": {
@@ -701,6 +848,29 @@
               }
             ],
             "title": "Rooms"
+          },
+          "property_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PropertyType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "building_age_max": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building Age Max"
           },
           "parking": {
             "anyOf": [
@@ -871,6 +1041,10 @@
             ],
             "title": "Budget Max"
           },
+          "budget_is_approximate": {
+            "type": "boolean",
+            "title": "Budget Is Approximate"
+          },
           "rooms": {
             "anyOf": [
               {
@@ -881,6 +1055,27 @@
               }
             ],
             "title": "Rooms"
+          },
+          "property_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PropertyType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "building_age_max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building Age Max"
           },
           "parking": {
             "anyOf": [
@@ -956,6 +1151,16 @@
             "type": "array",
             "title": "Interactions",
             "default": []
+          },
+          "latest_analysis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AIAnalysisRead"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -970,7 +1175,10 @@
           "location",
           "budget_min",
           "budget_max",
+          "budget_is_approximate",
           "rooms",
+          "property_type",
+          "building_age_max",
           "parking",
           "purpose",
           "purchase_timeline",
@@ -1097,6 +1305,10 @@
             ],
             "title": "Budget Max"
           },
+          "budget_is_approximate": {
+            "type": "boolean",
+            "title": "Budget Is Approximate"
+          },
           "rooms": {
             "anyOf": [
               {
@@ -1107,6 +1319,27 @@
               }
             ],
             "title": "Rooms"
+          },
+          "property_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PropertyType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "building_age_max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building Age Max"
           },
           "parking": {
             "anyOf": [
@@ -1188,7 +1421,10 @@
           "location",
           "budget_min",
           "budget_max",
+          "budget_is_approximate",
           "rooms",
+          "property_type",
+          "building_age_max",
           "parking",
           "purpose",
           "purchase_timeline",
@@ -1334,6 +1570,17 @@
             ],
             "title": "Budget Max"
           },
+          "budget_is_approximate": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Is Approximate"
+          },
           "rooms": {
             "anyOf": [
               {
@@ -1346,6 +1593,29 @@
               }
             ],
             "title": "Rooms"
+          },
+          "property_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PropertyType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "building_age_max": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building Age Max"
           },
           "parking": {
             "anyOf": [
@@ -1385,6 +1655,143 @@
         "type": "object",
         "title": "LeadUpdate",
         "description": "PATCH 用。所有欄位都是選填，只更新有帶的欄位。"
+      },
+      "ParsedRequirement": {
+        "properties": {
+          "location": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location",
+            "description": "客戶提到的區域，保留原話"
+          },
+          "budget_min": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Min"
+          },
+          "budget_max": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 1000000000.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Max"
+          },
+          "budget_is_approximate": {
+            "type": "boolean",
+            "title": "Budget Is Approximate",
+            "description": "客戶說的是概數（2000 萬左右）還是精確數字",
+            "default": false
+          },
+          "rooms": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 20.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rooms"
+          },
+          "property_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PropertyType"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "building_age_max": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 100.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Building Age Max",
+            "description": "可接受的屋齡上限（年）"
+          },
+          "parking": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parking"
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Purpose"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "purchase_timeline": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 120.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purchase Timeline",
+            "description": "預計幾個月內購買"
+          }
+        },
+        "type": "object",
+        "title": "ParsedRequirement",
+        "description": "AI 從客戶原話抽取出的結構化需求。\n\n每個欄位都可以是 None，而且 None 有明確意義：**客戶沒提到**。\n這是刻意的設計。抽取規則裡最重要的兩條原則是「不推算」與「不補全」：\n客戶說「不急」，purchase_timeline 就是 None，不能猜成 6 個月。"
+      },
+      "PropertyType": {
+        "type": "string",
+        "enum": [
+          "ELEVATOR_BUILDING",
+          "LOW_RISE",
+          "APARTMENT",
+          "TOWNHOUSE",
+          "VILLA",
+          "STUDIO"
+        ],
+        "title": "PropertyType",
+        "description": "房屋類型。\n\n只收這六類，是因為 AI 的輸出必須落在可列舉的集合裡：\n若允許自由字串，「電梯大樓」「大樓」「電梯華廈」會變成三個不同的值，\nSprint 4 算準確率時就無法比對，日後要做物件搜尋也沒辦法下條件。"
       },
       "Purpose": {
         "type": "string",
