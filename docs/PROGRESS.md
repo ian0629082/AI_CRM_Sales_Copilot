@@ -1,6 +1,6 @@
 # 開發進度與後續規劃
 
-> 最後更新：2026-08-24
+> 最後更新：2026-08-26
 >
 > 這份文件記錄「做到哪裡」與「為什麼這樣做」。
 > 操作指令請看 [README.md](../README.md)，完整構想請看 [開發規劃書](../AI_CRM_Sales_Copilot_開發規劃.md)。
@@ -14,7 +14,7 @@
 | 0 | Planning：Business Problem / User Story / ERD / API Contract | ✅ |
 | 1 | CRM Core：Lead & Interaction CRUD、Auth、Alembic | ✅ |
 | 2 | Vertical Slice：Next.js 前端，前端到資料庫全鏈路跑通 | ✅ |
-| 3 | AI Requirement Parsing | 🔜 設計已定案，尚未實作 |
+| 3 | AI Requirement Parsing | ✅ |
 | 4 | AI Evaluation Dataset | ⬜ |
 | 5 | Lead Scoring + Follow-up Recommendation | ⬜ |
 | 6 | Quality：Testing / Logging / Error Handling / Security | ⬜ |
@@ -40,6 +40,15 @@
 - 頁面：登入、註冊、客戶列表、新增客戶、客戶詳細頁
 - 前端型別由後端 OpenAPI schema 自動生成，不手寫
 
+### Sprint 3 完成內容
+
+- 新增 `budget_is_approximate` / `property_type` / `building_age_max` 三個欄位與 `ai_analysis` 表
+- 四層分工：`LeadService → AIService → LLMProvider → OpenAI SDK`
+- OpenAI Structured Output（strict JSON Schema）+ Pydantic 二次驗證
+- `POST /leads/{id}/analyze`：同步等待約 1～4 秒
+- 前端：「AI 解析」按鈕、loading、失敗就地重試、欄位上的 `AI` 徽章
+- 後端測試 85 個（新增 20 個，全部用假 provider，不呼叫真實 OpenAI）
+
 ### 環境現況
 
 | 項目 | 狀態 |
@@ -48,6 +57,7 @@
 | GitHub | `github.com/ian0629082/AI_CRM_Sales_Copilot` |
 | 分支 | `main` / `develop` / `feature/*`，皆已推送 |
 | OpenAI API Key | 已填入 `backend/.env` |
+| LLM 型號 | `gpt-5.4-mini`（環境變數 `OPENAI_MODEL`，換型號不必改程式碼） |
 | Docker | 尚未安裝（Sprint 7 才需要） |
 | Demo 帳號 | `demo@example.com` / `demo1234`，Neon 上有測試資料 |
 
@@ -103,7 +113,7 @@ token 簽章有效不代表帳號還在，只驗簽章是不夠的。
 
 ---
 
-## 三、Sprint 3 設計決議（已討論定案，尚未實作）
+## 三、Sprint 3 設計決議（已實作）
 
 ### 分層
 
@@ -210,20 +220,27 @@ OpenAI SDK
 - **單元測試不呼叫真實 OpenAI**：把 `LLMProvider` 換成假的回傳固定 JSON。
   測「AI 準不準」是 Sprint 4 Evaluation 的職責，用另一套機制
 
+### 實作時多出來的兩個決定
+
+原本的設計沒討論到，但寫下去才發現非決定不可：
+
+**AI 只填、不清空。**
+AI 回 `null` 代表「客戶沒提到」，不代表「業務填錯了」。
+若讓 `null` 覆蓋業務手動輸入的內容，按一次「AI 解析」就會清掉自己剛填好的資料——
+那是會讓人再也不敢按第二顆按鈕的行為。要清空欄位請用一般編輯功能，那是明確的意圖表達。
+
+**「AI 徽章」用比對而不是旗標。**
+畫面上的 `AI` 徽章，是拿 lead 現值跟 `ai_analysis.parsed_result` 比對得出的，
+不是另外存一個「這欄是 AI 填的」布林值。
+好處是業務手動改過之後徽章會自動消失——值已經不是 AI 給的了，還掛著徽章就是在騙人。
+
+**`budget_is_approximate` 不開放在新增客戶時填。**
+它回答的是「客戶說預算時的語氣」，這件事只有讀過原話才知道，
+所以由 AI 解析填入，或事後用 PATCH 修改。
+
 ---
 
 ## 四、後續 Sprint 規劃
-
-### Sprint 3：AI Requirement Parsing
-
-1. 新增 3 個欄位（`budget_is_approximate` / `property_type` / `building_age_max`）與 `ai_analysis` 表，跑 migration
-2. `LLMProvider` 介面 + OpenAI 實作
-3. `AIService`：prompt、JSON Schema、Pydantic 驗證
-4. `POST /leads/{id}/analyze` API
-5. 前端：客戶詳細頁的「AI 解析」按鈕、loading、失敗重試、AI 徽章
-6. 測試（用假的 provider）
-
-**產出**：貼上客戶原話 → 一鍵 → 欄位自動填好。
 
 ### Sprint 4：AI Evaluation
 
@@ -315,8 +332,9 @@ cd frontend && npm run gen:api
 
 ## 六、下一步
 
-Sprint 3 的第一個動作：**列出 OpenAI 帳號可用的模型**，挑定型號後開始實作。
+Sprint 4：AI Evaluation。第一個動作是**建立 `tests/evaluation_dataset.json`**，
+30～100 筆模擬客戶需求，逐筆人工標註 10 個欄位的 Ground Truth。
 
-`OPENAI_API_KEY` 已填入 `backend/.env`，可直接開工。
+標註標準就是第三節那張「抽取規則」表——它當初就是為了這一刻才先定下來的。
 
-建議在 `feature/ai-parsing` 分支上進行。
+建議在 `feature/ai-evaluation` 分支上進行。

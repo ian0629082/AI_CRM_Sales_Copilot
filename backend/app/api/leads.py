@@ -7,17 +7,19 @@
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_ai_service, get_current_user
 from app.db.database import get_db
 from app.models.enums import LeadStatus
 from app.models.user import User
 from app.schemas.lead import (
+    LeadAnalyzeResponse,
     LeadCreate,
     LeadDetail,
     LeadListResponse,
     LeadRead,
     LeadUpdate,
 )
+from app.services.ai_service import AIService
 from app.services.lead_service import LeadService
 
 router = APIRouter(prefix="/leads", tags=["leads"])
@@ -26,13 +28,14 @@ router = APIRouter(prefix="/leads", tags=["leads"])
 def get_lead_service(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
+    ai_service: AIService | None = Depends(get_ai_service),
 ) -> LeadService:
     """把登入者綁進 Service。
 
-    授權寫在這個 dependency 裡，而不是每支 route 各寫一次 —— 
+    授權寫在這個 dependency 裡，而不是每支 route 各寫一次 ——
     少了重複，也就少了某支 API 忘記加保護的可能。
     """
-    return LeadService(db, current_user)
+    return LeadService(db, current_user, ai_service)
 
 
 @router.post("", response_model=LeadRead, status_code=status.HTTP_201_CREATED)
@@ -70,6 +73,23 @@ def update_lead(
     service: LeadService = Depends(get_lead_service),
 ):
     return service.update_lead(lead_id, payload)
+
+
+@router.post("/{lead_id}/analyze", response_model=LeadAnalyzeResponse)
+def analyze_lead(lead_id: int, service: LeadService = Depends(get_lead_service)):
+    """把客戶原話交給 AI 解析，結果直接寫回這位客戶的需求欄位。
+
+    同步等待（約 2～5 秒），前端顯示 loading。
+    做成同步是因為 MVP 階段一次只分析一筆，排背景工作要多一個 queue 與輪詢機制，
+    複雜度換不到對應的好處；真的要批次分析時再改。
+
+    可能的失敗：
+    - 404 這位客戶不存在（或不是你的）
+    - 422 這位客戶還沒填原始需求
+    - 503 AI 暫時不可用 —— 客戶資料本身不受影響，前端顯示重試按鈕
+    """
+    lead, analysis = service.analyze_lead(lead_id)
+    return LeadAnalyzeResponse(lead=lead, analysis=analysis)
 
 
 @router.delete("/{lead_id}", status_code=status.HTTP_204_NO_CONTENT)
