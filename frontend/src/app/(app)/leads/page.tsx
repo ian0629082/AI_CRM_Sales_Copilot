@@ -60,7 +60,9 @@ export default function LeadsPage() {
           </p>
         </div>
         {/* Base UI 用 render prop 把樣式套到 Link 上，取代 Radix 的 asChild */}
-        <Button render={<Link href="/leads/new" />}>新增客戶</Button>
+        <Button nativeButton={false} render={<Link href="/leads/new" />}>
+          新增客戶
+        </Button>
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row">
@@ -75,7 +77,15 @@ export default function LeadsPage() {
           onValueChange={(v) => setStatus(v ?? ALL_STATUS)}
         >
           <SelectTrigger className="sm:w-40">
-            <SelectValue placeholder="全部狀態" />
+            {/* SelectValue 預設印出原始的 enum 值（ALL、NEW…），
+                這裡自己渲染中文標籤 */}
+            <SelectValue>
+              {() =>
+                status === ALL_STATUS
+                  ? "全部狀態"
+                  : LEAD_STATUS_LABEL[status as LeadStatus]
+              }
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={ALL_STATUS}>全部狀態</SelectItem>

@@ -44,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(access_token);
       // 重新抓取使用者資料，讓 UI 立刻反映登入狀態
       await queryClient.invalidateQueries({ queryKey: ["me"] });
-      router.push("/leads");
+      router.push("/dashboard");
     },
     [queryClient, router],
   );

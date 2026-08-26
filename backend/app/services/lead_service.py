@@ -76,9 +76,22 @@ class LeadService:
         if lead is None:
             raise NotFoundError(f"Lead {lead_id} 不存在")
 
-        # 掛一個非資料庫欄位上去給 schema 讀。
-        # 理由不存資料庫，所以在這裡即時算出來。
-        lead.score_reasons = calculate_score(lead).reasons
+        # 分數與理由必須來自**同一次計算**。
+        #
+        # 這裡曾經只算理由、分數沿用資料庫存的值，結果畫面上出現
+        # 「分數 0，但理由列了 +20 +15 +15 +10」——因為舊資料的
+        # lead_score 是 NULL（建立時還沒有計分功能），理由卻是即時算的。
+        #
+        # 存起來的東西一定會過期，所以讀取時一律重算，
+        # 順手把過期的值寫回去（規則是確定性的，寫回去不會有副作用）。
+        result = calculate_score(lead)
+        lead.score_reasons = result.reasons
+
+        if lead.lead_score != result.score or lead.lead_level != result.level:
+            lead.lead_score = result.score
+            lead.lead_level = result.level
+            self.repo.save(lead)
+
         return lead
 
     def list_leads(

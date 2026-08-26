@@ -99,6 +99,13 @@ function isAiFilled(lead: LeadDetail, field: RequirementField): boolean {
   return aiValue !== null && aiValue !== undefined && aiValue === lead[field];
 }
 
+/** 提醒日是不是已經到了或過了。後端用同一條判斷決定要不要進待跟進清單。 */
+function isOverdue(isoDate: string): boolean {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return new Date(isoDate) <= today;
+}
+
 /** 顯示單一欄位。值為空時統一顯示破折號，避免畫面出現空白洞。 */
 function Field({
   label,
@@ -217,7 +224,12 @@ export default function LeadDetailPage() {
           <p className="text-muted-foreground">
             {is404 ? "找不到這位客戶" : "載入失敗，請稍後再試"}
           </p>
-          <Button className="mt-4" variant="outline" render={<Link href="/leads" />}>
+          <Button
+            className="mt-4"
+            variant="outline"
+            nativeButton={false}
+            render={<Link href="/leads" />}
+          >
             回客戶列表
           </Button>
         </div>
@@ -250,7 +262,9 @@ export default function LeadDetailPage() {
             disabled={updateLead.isPending}
           >
             <SelectTrigger className="w-36">
-              <SelectValue />
+              {/* SelectValue 預設印出原始的 enum 值（NEW、CONTACTED），
+                  這裡自己渲染中文，跟旁邊的徽章保持一致 */}
+              <SelectValue>{() => LEAD_STATUS_LABEL[lead.status]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {LEAD_STATUS_ORDER.map((s) => (
@@ -574,10 +588,27 @@ export default function LeadDetailPage() {
                   </p>
                 </div>
               ) : lead.next_follow_up_at ? (
-                <Field
-                  label="下次提醒"
-                  value={formatDate(lead.next_follow_up_at)}
-                />
+                <div className="space-y-1">
+                  <p className="text-xs text-muted-foreground">下次提醒</p>
+                  <p
+                    className={
+                      "text-sm " +
+                      (isOverdue(lead.next_follow_up_at)
+                        ? "font-medium text-amber-600 dark:text-amber-400"
+                        : "")
+                    }
+                  >
+                    {formatDate(lead.next_follow_up_at)}
+                    {isOverdue(lead.next_follow_up_at) ? "（已到期）" : null}
+                  </p>
+                </div>
+              ) : lead.interactions.length > 0 ? (
+                /* 聯絡過但沒有提醒日 —— 多半是 Sprint 5 之前留下的資料。
+                   這時候不能說「還沒有人聯絡過」，下面明明就有互動紀錄。 */
+                <p className="text-xs text-muted-foreground">
+                  聯絡過，但還沒設定下次提醒。新增一筆互動時順手選一個時間，
+                  在那之前他會一直留在待跟進清單裡。
+                </p>
               ) : (
                 <p className="text-xs text-muted-foreground">
                   還沒有人聯絡過這位客戶。建檔滿一天後會出現在「新進未聯絡」清單。

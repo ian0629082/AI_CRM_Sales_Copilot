@@ -310,3 +310,31 @@ def test_detail_page_explains_the_score(client):
     codes = {r["code"] for r in detail["score_reasons"]}
     assert {"phone", "location", "budget_exact"} <= codes
     assert sum(r["points"] for r in detail["score_reasons"]) == detail["lead_score"]
+
+
+def test_stale_stored_score_is_repaired_on_read(client, db_session):
+    """存起來的分數過期時，讀取要修好它，而不是照著顯示。
+
+    這個測試來自一個真實的畫面 bug：Sprint 5 之前建立的客戶
+    lead_score 是 NULL，但計分理由是讀取時即時算的，
+    結果畫面上出現「分數 0，理由卻列了 +60」。
+
+    分數與理由必須來自同一次計算，否則使用者看到的就是自相矛盾的東西。
+    """
+    from app.models.lead import Lead
+
+    lead = client.post(
+        f"{PREFIX}/leads", json={"name": "舊資料", "location": "七期"}
+    ).json()
+
+    # 模擬 Sprint 5 之前的資料：有需求，但從來沒被計分過
+    row = db_session.get(Lead, lead["id"])
+    row.lead_score = None
+    row.lead_level = None
+    db_session.commit()
+
+    detail = client.get(f"{PREFIX}/leads/{lead['id']}").json()
+
+    assert detail["lead_score"] == sum(r["points"] for r in detail["score_reasons"])
+    assert detail["lead_score"] > 0
+    assert detail["lead_level"] is not None
