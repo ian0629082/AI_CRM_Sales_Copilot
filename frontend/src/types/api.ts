@@ -280,11 +280,8 @@ export interface components {
             content: string;
             /** Next Follow Up Days */
             next_follow_up_days?: number | null;
-            /**
-             * Mute Follow Up
-             * @default false
-             */
-            mute_follow_up: boolean;
+            /** Mute Follow Up */
+            mute_follow_up?: boolean | null;
         };
         /** InteractionRead */
         InteractionRead: {

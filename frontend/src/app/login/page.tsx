@@ -34,7 +34,7 @@ export default function LoginPage() {
 
   // 已經登入的人不該再看到登入頁
   useEffect(() => {
-    if (!isLoading && user) router.replace("/leads");
+    if (!isLoading && user) router.replace("/dashboard");
   }, [isLoading, user, router]);
 
   const {

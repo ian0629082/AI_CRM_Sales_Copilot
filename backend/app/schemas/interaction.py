@@ -18,7 +18,11 @@ class InteractionCreate(BaseModel):
 
     # 明確關閉這位客戶的提醒（成交、流失、確定放棄）。
     # 與「不填 next_follow_up_days」不同：那是「用預設」，這是「不要提醒」。
-    mute_follow_up: bool = False
+    #
+    # 用 bool | None 而不是預設 False，是因為帶 default 的欄位在
+    # OpenAPI 上仍會被標成必填，前端生成的型別就會逼每一次呼叫都帶這個旗標。
+    # None 表示「沒有意見」，跟不帶這個欄位是同一件事。
+    mute_follow_up: bool | None = None
 
 
 class InteractionRead(BaseModel):

@@ -29,6 +29,7 @@ import {
 } from "@/lib/hooks/use-leads";
 import {
   INTERACTION_TYPE_LABEL,
+  LEAD_LEVEL_CLASS,
   LEAD_LEVEL_LABEL,
   LEAD_SOURCE_LABEL,
   LEAD_STATUS_CLASS,
@@ -39,8 +40,27 @@ import {
   URGENCY_CLASS,
   URGENCY_LABEL,
   formatBudgetRange,
+  formatDate,
   formatDateTime,
 } from "@/lib/lead-display";
+
+/**
+ * 「下次提醒」的快捷選項。
+ *
+ * 給按鈕而不是日期選擇器，是因為業務記錄互動時想的是「三天後再打給他」，
+ * 不是「10 月 29 日」。多一次心算就多一個不填的理由，
+ * 而這個欄位不填的代價是客戶會安靜地消失。
+ *
+ * null 代表「用系統預設」（依互動類型決定），不是「不提醒」。
+ */
+const FOLLOW_UP_CHOICES: { label: string; days: number | null; mute?: boolean }[] = [
+  { label: "預設", days: null },
+  { label: "明天", days: 1 },
+  { label: "3 天", days: 3 },
+  { label: "1 週", days: 7 },
+  { label: "2 週", days: 14 },
+  { label: "不用提醒", days: null, mute: true },
+];
 
 const INTERACTION_TYPES: InteractionType[] = [
   "CALL",
@@ -122,6 +142,7 @@ export default function LeadDetailPage() {
 
   const [interactionType, setInteractionType] = useState<InteractionType>("CALL");
   const [interactionContent, setInteractionContent] = useState("");
+  const [followUpChoice, setFollowUpChoice] = useState(0);
 
   async function handleStatusChange(next: string | null) {
     if (!next) return;
@@ -138,12 +159,18 @@ export default function LeadDetailPage() {
     if (!interactionContent.trim()) return;
 
     try {
+      const choice = FOLLOW_UP_CHOICES[followUpChoice];
       await createInteraction.mutateAsync({
         type: interactionType,
         content: interactionContent.trim(),
+        next_follow_up_days: choice.days,
+        mute_follow_up: choice.mute ?? null,
       });
       setInteractionContent("");
-      toast.success("已新增互動紀錄");
+      setFollowUpChoice(0);
+      toast.success(
+        choice.mute ? "已新增紀錄，並關閉這位客戶的提醒" : "已新增互動紀錄",
+      );
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "新增失敗");
     }
@@ -416,6 +443,25 @@ export default function LeadDetailPage() {
                     className="flex-1"
                   />
                 </div>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs text-muted-foreground">下次提醒</span>
+                  {FOLLOW_UP_CHOICES.map((choice, index) => (
+                    <button
+                      key={choice.label}
+                      type="button"
+                      onClick={() => setFollowUpChoice(index)}
+                      className={
+                        "rounded-full border px-2.5 py-1 text-xs transition-colors " +
+                        (index === followUpChoice
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-input hover:bg-muted")
+                      }
+                    >
+                      {choice.label}
+                    </button>
+                  ))}
+                </div>
+
                 <Button
                   type="submit"
                   size="sm"
@@ -465,26 +511,77 @@ export default function LeadDetailPage() {
             <CardHeader>
               <CardTitle className="text-base">Lead Score</CardTitle>
             </CardHeader>
-            <CardContent>
-              {lead.lead_score === null || lead.lead_score === undefined ? (
-                <div className="space-y-2">
-                  <p className="text-3xl font-semibold text-muted-foreground">—</p>
-                  <p className="text-xs text-muted-foreground">
-                    Sprint 5 加入 Rule-based Scoring Engine 後，
-                    這裡會顯示客戶的優先程度與評分理由。
-                  </p>
-                </div>
+            <CardContent className="space-y-3">
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-semibold tabular-nums">
+                  {lead.lead_score ?? 0}
+                </span>
+                <span className="text-sm text-muted-foreground">/ 100</span>
+                {lead.lead_level ? (
+                  <Badge
+                    variant="secondary"
+                    className={"ml-auto " + LEAD_LEVEL_CLASS[lead.lead_level]}
+                  >
+                    {LEAD_LEVEL_LABEL[lead.lead_level]}
+                  </Badge>
+                ) : null}
+              </div>
+
+              {/* 逐條列出分數怎麼來的。
+                  「可解釋」不是加分項，是這個分數敢拿來排序的前提 ——
+                  一個講不出理由的分數，沒有業務會照著它打電話。 */}
+              {lead.score_reasons.length > 0 ? (
+                <ul className="space-y-1 border-t pt-3">
+                  {lead.score_reasons.map((reason) => (
+                    <li
+                      key={reason.code}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <span className="text-muted-foreground">{reason.label}</span>
+                      <span
+                        className={
+                          "tabular-nums " +
+                          (reason.points < 0 ? "text-rose-600" : "text-foreground")
+                        }
+                      >
+                        {reason.points > 0 ? `+${reason.points}` : reason.points}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               ) : (
-                <div className="space-y-2">
-                  <p className="text-3xl font-semibold tabular-nums">
-                    {lead.lead_score}
+                <p className="border-t pt-3 text-xs text-muted-foreground">
+                  這位客戶還沒有任何可計分的資訊。填入需求或按「AI 解析」後就會有分數。
+                </p>
+              )}
+
+              <p className="text-xs text-muted-foreground">
+                分數只看客戶本身，不看跟進了多少次——這樣新客戶跟老客戶才能直接比較。
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">跟進提醒</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {lead.follow_up_muted ? (
+                <div className="rounded-md bg-muted p-3 text-sm">
+                  <p className="font-medium">🔕 已關閉提醒</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    這位客戶不會出現在待跟進清單裡。新增一筆互動就會自動恢復提醒。
                   </p>
-                  {lead.lead_level ? (
-                    <Badge variant="secondary">
-                      {LEAD_LEVEL_LABEL[lead.lead_level]}
-                    </Badge>
-                  ) : null}
                 </div>
+              ) : lead.next_follow_up_at ? (
+                <Field
+                  label="下次提醒"
+                  value={formatDate(lead.next_follow_up_at)}
+                />
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  還沒有人聯絡過這位客戶。建檔滿一天後會出現在「新進未聯絡」清單。
+                </p>
               )}
             </CardContent>
           </Card>

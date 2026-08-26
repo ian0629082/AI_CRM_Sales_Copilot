@@ -16,7 +16,7 @@
 | 2 | Vertical Slice：Next.js 前端，前端到資料庫全鏈路跑通 | ✅ |
 | 3 | AI Requirement Parsing | ✅ |
 | 4 | AI Evaluation Dataset | ✅ |
-| 5 | Lead Scoring + Follow-up Recommendation | ⬜ |
+| 5 | Lead Scoring + Follow-up | 🔄 Scoring 與 Need Follow-up 完成，AI 建議未做 |
 | 6 | Quality：Testing / Logging / Error Handling / Security | ⬜ |
 | 7 | Deployment：Docker / CI/CD / 上線 | ⬜ **← MVP 完成，可開始投履歷** |
 | 8 | n8n Automation | ⬜ |
@@ -58,6 +58,19 @@
 - 模型比較結論：gpt-5.4-mini 是甜蜜點，換 gpt-5.4 買不到準確率
 - 完整結果見 [docs/evaluation/README.md](evaluation/README.md)
 - 後端測試 106 個
+
+### Sprint 5 進行中
+
+已完成：
+
+- 新增 `urgency` 欄位（AI 判斷急迫語氣），prompt v3 → v4
+- `ScoringService`：deterministic Rule Engine，滿分 100，逐條列出計分理由
+- Need Follow-up：兩份分開的清單（新進未聯絡 / 到期跟進）+ 靜音機制
+- Dashboard：客戶總數、意願分佈、待跟進、成交率、銷售漏斗
+- 前端：計分理由卡片、下次提醒快捷鈕、列表靜音標示
+- 後端測試 156 個
+
+未完成：AI Follow-up 建議、Follow-up Evaluation
 
 ### 環境現況
 
@@ -132,6 +145,37 @@ v2 的 prompt 是看著 v1 在開發集上的錯誤寫出來的，它在開發�
 **評估程式本身要有單元測試。**
 一份算錯的準確率比沒有準確率更糟，它會讓人對著錯的方向調 prompt，
 而且錯得很難察覺——沒有人會懷疑 87.3% 是算錯的。
+
+### Scoring 與跟進（Sprint 5）
+
+**Lead Score 只看客戶本身，不看業務做了多少事。**
+一度把「帶看過」算進分數，後來拿掉：那對新客戶不公平——
+剛填完表單的客戶不管條件多好，那幾分都是結構性拿不到的。
+一個拿不到滿分的族群跟一個拿得到的族群，分數就不能互相比較，
+而不能比較的分數拿來排序是危險的。
+拿掉之後，剛進來、需求清楚又很急的客戶可以拿到 100 分，正是該立刻打電話的那種人。
+
+**計分理由不存資料庫，每次讀取時重算。**
+規則是確定性的，同樣的資料一定得到同樣的理由，存起來只會多一份可能過期的副本。
+理由加總必須等於分數，有測試守著——「可解釋」不是加分項，
+是這個分數敢拿來排序的前提。
+
+**跟進提醒由業務填，系統只給預設值。**
+原本寫了一整張規則表（議價 2 天、帶看 1 天、說不急 14 天，還有優先順序），
+後來整張丟掉。業務知道的比規則多：客戶說「我下週三再回你」，
+業務填 7 天就對了，規則猜不到那句話。
+規則因此降級成「建議的預設值」，業務隨時可以覆蓋。
+
+**備註預設隔天再提醒。**
+「備註」是個大雜燴——可能是「致電未接」，也可能是「客戶說下週回覆」。
+系統分不出來，所以往保守的方向猜：假設還沒聯絡上。
+漏掉一個沒接通的客戶，代價比多提醒一次大得多。
+
+**待跟進分兩堆，靜音只給數字。**
+「新進未聯絡」與「到期跟進」對應兩種不同的業務動作，混在一起就分不出
+哪些是還沒認識、哪些是快跑掉了。
+靜音的客戶不列在清單裡——一份會冒出你關過的人的待辦清單，沒有人敢信；
+但要給個數字，不然業務會納悶那個客戶怎麼消失了。
 
 ### 前端層面
 
@@ -272,16 +316,10 @@ AI 回 `null` 代表「客戶沒提到」，不代表「業務填錯了」。
 
 ## 四、後續 Sprint 規劃
 
-### Sprint 5：Lead Scoring + Follow-up
+### Sprint 5 剩下的部分
 
-1. `ScoringService`：**deterministic Rule Engine**，不由 LLM 決定分數
-   - 預算明確 +15、區域明確 +10、房型明確 +10、3 個月內購買 +20、提供電話 +10……
-   - 輸出 score、level（HOT/WARM/COLD）與 reasons 清單
-2. AI Follow-up Recommendation：依 Lead 資料 + Score + 互動歷史產生建議
-3. Follow-up Evaluation：Criteria-based（是否使用互動歷史、是否捏造資訊、語氣是否合理）
-4. Dashboard：Total / Hot / Warm / Need Follow-up / Conversion Rate / Lead Funnel
-
-**關鍵賣點**：相同資料永遠得到相同 Score，因為它是規則不是 LLM。
+1. AI Follow-up Recommendation：依 Lead 資料 + Score + 互動歷史產生建議
+2. Follow-up Evaluation：Criteria-based（是否使用互動歷史、是否捏造資訊、語氣是否合理）
 
 ### Sprint 6：Quality
 

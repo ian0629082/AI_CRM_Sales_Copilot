@@ -95,6 +95,24 @@ export const URGENCY_CLASS: Record<Urgency, string> = {
   LOW: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
 };
 
+/**
+ * 分數的顏色。
+ *
+ * 用等級而不是分數區間決定顏色，這樣改門檻時只要改後端一個地方，
+ * 前端不會偷偷跟後端不同步。
+ */
+export const LEAD_LEVEL_CLASS: Record<LeadLevel, string> = {
+  HOT: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200",
+  WARM: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200",
+  COLD: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+};
+
+/** 待跟進清單的分類標題。兩堆對應兩種不同的業務動作，標題要講得出差別。 */
+export const FOLLOW_UP_BUCKET_LABEL: Record<string, string> = {
+  NEW_UNCONTACTED: "新進未聯絡",
+  DUE: "到期跟進",
+};
+
 export const INTERACTION_TYPE_LABEL: Record<InteractionType, string> = {
   CALL: "電話",
   LINE: "LINE",

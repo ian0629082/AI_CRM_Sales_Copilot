@@ -826,9 +826,15 @@
             "title": "Next Follow Up Days"
           },
           "mute_follow_up": {
-            "type": "boolean",
-            "title": "Mute Follow Up",
-            "default": false
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mute Follow Up"
           }
         },
         "type": "object",

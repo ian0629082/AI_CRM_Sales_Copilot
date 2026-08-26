@@ -25,6 +25,8 @@ import {
 import type { LeadStatus } from "@/lib/api/types";
 import { useLeads } from "@/lib/hooks/use-leads";
 import {
+  LEAD_LEVEL_CLASS,
+  LEAD_LEVEL_LABEL,
   LEAD_STATUS_CLASS,
   LEAD_STATUS_LABEL,
   LEAD_STATUS_ORDER,
@@ -118,8 +120,22 @@ export default function LeadsPage() {
               data.items.map((lead) => (
                 <TableRow key={lead.id} className="cursor-pointer">
                   <TableCell className="font-medium">
-                    <Link href={`/leads/${lead.id}`} className="hover:underline">
+                    <Link
+                      href={`/leads/${lead.id}`}
+                      className="inline-flex items-center gap-1.5 hover:underline"
+                    >
                       {lead.name}
+                      {/* 關掉提醒的客戶要看得出來，否則業務會納悶
+                          「這個人怎麼再也沒出現在待跟進清單裡」。
+                          用低調的圖示而不是badge —— 它是註記，不是狀態。 */}
+                      {lead.follow_up_muted ? (
+                        <span
+                          title="已關閉跟進提醒"
+                          className="text-xs text-muted-foreground"
+                        >
+                          🔕
+                        </span>
+                      ) : null}
                     </Link>
                   </TableCell>
                   <TableCell>
@@ -132,14 +148,29 @@ export default function LeadsPage() {
                   </TableCell>
                   <TableCell>{lead.location ?? "—"}</TableCell>
                   <TableCell>
-                    {formatBudgetRange(lead.budget_min, lead.budget_max)}
+                    {formatBudgetRange(
+                      lead.budget_min,
+                      lead.budget_max,
+                      lead.budget_is_approximate,
+                    )}
                   </TableCell>
                   <TableCell className="text-center">
                     {lead.rooms ? `${lead.rooms} 房` : "—"}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {/* Sprint 5 的 Scoring Engine 才會填這個欄位 */}
-                    {lead.lead_score ?? "—"}
+                  <TableCell className="text-right">
+                    <span className="inline-flex items-center gap-2">
+                      {lead.lead_level ? (
+                        <Badge
+                          variant="secondary"
+                          className={LEAD_LEVEL_CLASS[lead.lead_level]}
+                        >
+                          {LEAD_LEVEL_LABEL[lead.lead_level]}
+                        </Badge>
+                      ) : null}
+                      <span className="w-7 text-right tabular-nums">
+                        {lead.lead_score ?? "—"}
+                      </span>
+                    </span>
                   </TableCell>
                   <TableCell className="text-right text-muted-foreground">
                     {formatDate(lead.created_at)}
