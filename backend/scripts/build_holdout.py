@@ -118,9 +118,16 @@ def parse_money(text: str) -> tuple[int | None, int | None]:
     return None, one(parts[0])
 
 
+# 「沒有限制」的各種講法。
+#
+# 這些要當成「沒填」，不是當成錯誤。填表的人寫「不限」是在明確回答
+# 「這一項客戶沒有要求」—— 逼他改成留空，只是要他配合程式的想法。
+NO_LIMIT = ("不限", "不拘", "無", "沒有", "都可以", "都行", "沒差", "隨便")
+
+
 def parse_int(text: str, label: str) -> int | None:
     text = text.strip()
-    if not text:
+    if not text or any(word in text for word in NO_LIMIT):
         return None
     match = re.search(r"-?\d+", text)
     if not match:
@@ -210,6 +217,22 @@ def parse_block(title: str, lines: list[str], index: int) -> dict | None:
 
         if stripped.startswith("互動紀錄"):
             in_interactions = True
+            # 「互動紀錄」後面如果還有字，那是有人把內容直接寫在標題行上。
+            #
+            # 這件事真的發生了：有人寫「互動紀錄 已聯繫上，詢問需求後會再連絡」，
+            # 而原本的程式只是把整行當成標題跳過 —— 那筆紀錄就這樣**靜默消失**。
+            #
+            # 靜默丟資料是這支程式最不能犯的錯：他以為自己出了一題有互動歷史的，
+            # 實際上跑的是一題沒有歷史的，而報告上不會有任何跡象。
+            # 寧可在這裡擋下來要他改，也不要讓他拿到一份悄悄少了東西的資料集。
+            leftover = re.sub(r"^互動紀錄", "", stripped)
+            leftover = re.sub(r"^（.*?）", "", leftover.strip()).strip()
+            if leftover:
+                raise FormError(
+                    f"「互動紀錄」這四個字後面不要直接寫內容：「{leftover}」\n"
+                    "  請換到下一行，並且加上「幾天前」和管道，例如\n"
+                    "  2天前 電話 已聯繫上，問完需求，有適合的案件再跟他連絡"
+                )
             continue
 
         # 用全形括號整行包起來的是範本裡的說明，跳過。

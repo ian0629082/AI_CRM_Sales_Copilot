@@ -227,3 +227,44 @@ def test_bracketed_hint_lines_are_skipped():
     title, lines = split_blocks(text)[0]
     case = parse_block(title, lines, 1)
     assert [i["content"] for i in case["interactions"]] == ["真正的紀錄"]
+
+
+def test_no_limit_wording_counts_as_blank():
+    """「不限」是明確回答「客戶沒有這個要求」，不是填錯。
+
+    逼人把「不限」改成留空，只是要他配合程式的想法。
+    """
+    text = """
+=== 第 1 位 ===
+姓名：胡小姐
+狀態：已聯絡
+建檔幾天了：2
+房數：不限
+屋齡上限：不限
+--- 這一位結束 ---
+"""
+    title, lines = split_blocks(text)[0]
+    lead = parse_block(title, lines, 1)["lead"]
+    assert "rooms" not in lead
+    assert "building_age_max" not in lead
+
+
+def test_content_on_the_interactions_header_line_is_an_error():
+    """把互動內容直接寫在「互動紀錄」那一行，不能靜默丟掉。
+
+    這真的發生過。原本的程式把整行當標題跳過，那筆紀錄就這樣消失——
+    他以為自己出了一題有互動歷史的，實際上跑的是一題沒有歷史的，
+    而報告上不會有任何跡象。靜默丟資料是這支程式最不能犯的錯。
+    """
+    text = """
+=== 第 1 位 ===
+姓名：胡小姐
+狀態：已聯絡
+建檔幾天了：2
+
+互動紀錄 已聯繫上，詢問需求後有適合案件會再與客戶連絡
+--- 這一位結束 ---
+"""
+    title, lines = split_blocks(text)[0]
+    with pytest.raises(FormError, match="不要直接寫內容"):
+        parse_block(title, lines, 1)
