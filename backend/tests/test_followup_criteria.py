@@ -122,6 +122,22 @@ def test_invented_number_fails():
     assert "3500" in result.detail
 
 
+def test_numbers_without_a_property_unit_are_ignored():
+    """「花 1 分鐘跟您確認」不是捏造。
+
+    第一輪評估真的誤判了這一筆。那個 1 客戶確實沒講過，
+    但它是業務自己的話，不是關於客戶的事實。
+    這條判準要抓的是坪數、價格、樓層、屋齡——業務會照著念、
+    念錯了客戶當場就知道他在編的那種數字。
+    """
+    assert check_numbers_grounded("我先花 1 分鐘跟您確認", SOURCE).verdict is Verdict.PASS
+
+
+def test_property_unit_numbers_are_still_caught():
+    for text in ("那間 35 坪", "在 12 樓", "屋齡 8 年"):
+        assert check_numbers_grounded(text, SOURCE).verdict is Verdict.FAIL
+
+
 def test_chinese_numerals_are_ignored():
     """中文數字不抓。
 

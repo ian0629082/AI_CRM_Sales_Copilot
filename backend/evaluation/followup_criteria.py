@@ -147,10 +147,18 @@ def check_actionable(next_action: str) -> CriterionResult:
     return CriterionResult("actionable", Verdict.PASS)
 
 
-# 阿拉伯數字（含小數、逗號分隔）。
-# 只抓阿拉伯數字，不抓中文數字：「三天後」的「三」是模型自己算出來的時間，
-# 不是引用客戶的話，抓了只會製造一堆假警報。
-_NUMBER = re.compile(r"\d[\d,\.]*")
+# 只抓「數字 + 房產單位」的組合，例如 2000 萬、30 坪、12 樓、15 年、3 房。
+#
+# 一開始抓的是所有阿拉伯數字，第一輪評估就誤判了一筆：
+# 話術寫「我先花 1 分鐘跟您確認」，那個 1 被當成沒有出處的數字。
+# 它說得沒錯——客戶確實沒講過 1——但那是業務自己的話，不是關於客戶的事實。
+#
+# 收窄到房產單位，抓的才是真正會出事的那種數字：
+# 坪數、價格、樓層、屋齡。業務會照著念，念錯了客戶當場就知道他在編。
+#
+# 中文數字一律不抓：「三天後再約他」的「三」是模型自己算的時間。
+# 一個天天誤報的指標會被忽略，然後真的出事時也沒人看。
+_NUMBER = re.compile(r"\d[\d,\.]*\s*(?:萬|億|坪|樓|房|廳|衛|年|元|千)")
 
 
 def check_numbers_grounded(talking_point: str, source_text: str) -> CriterionResult:
@@ -164,8 +172,12 @@ def check_numbers_grounded(talking_point: str, source_text: str) -> CriterionRes
     所以它的失敗不代表一定捏造，是一份**要人去看一眼**的清單。
     """
     normalized_source = normalize(source_text)
+    # 抓出來的字串要跟來源用同一條規則正規化才能比。
+    # 「預算 2000 萬」抓到的是帶空白的 "2000 萬"，來源那邊空白已經拿掉了，
+    # 少了這一步，每一個帶空白的金額都會被誤判成捏造 ——
+    # 而金額正是這條判準最該抓對的東西。
     suspicious = [
-        n for n in _NUMBER.findall(talking_point) if n not in normalized_source
+        n for n in _NUMBER.findall(talking_point) if normalize(n) not in normalized_source
     ]
 
     if suspicious:

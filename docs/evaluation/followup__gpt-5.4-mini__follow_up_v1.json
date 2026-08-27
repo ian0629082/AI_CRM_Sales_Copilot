@@ -1,0 +1,55 @@
+{
+  "model": "gpt-5.4-mini",
+  "prompt_version": "follow_up_v1",
+  "dataset_version": "v1",
+  "cases": [
+    {
+      "case_id": "fu-001",
+      "tags": [
+        "no_history",
+        "hot"
+      ],
+      "suggestion": {
+        "next_action": "今天直接致電陳先生，確認他下個月開始上班的時間點，並約他這週先看七期符合三房、電梯大樓、要有車位的物件。",
+        "talking_point": "陳先生，剛看到您說下個月要過去上班，所以我先想跟您確認一下，您最近這週哪天比較方便，我幫您直接安排七期三房、電梯大樓、又有車位的案子先看起來，讓您不用趕得太急。",
+        "suggested_timing": "今天盡快聯絡，最好在下午到傍晚先打第一次電話；若沒接通，今晚再補一次。",
+        "evidence": [
+          "想在七期找三房電梯大樓",
+          "預算 2000 萬左右",
+          "要有車位",
+          "我下個月要過去上班所以有點急"
+        ]
+      },
+      "source_text": "想在七期找三房電梯大樓，預算 2000 萬左右，要有車位，我下個月要過去上班所以有點急",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "N/A",
+          "detail": "這筆沒有互動紀錄"
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        }
+      ],
+      "judge": null
+    }
+  ],
+  "failures": [
+    {
+      "case_id": "fu-002",
+      "reason": "AI 回傳的內容不符合預期格式，請再試一次"
+    }
+  ]
+}

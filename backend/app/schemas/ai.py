@@ -14,7 +14,7 @@ strict 模式傳不了 minimum / maximum 這類數值約束，所以這第二道
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from app.models.enums import PropertyType, Purpose, Urgency
 
@@ -22,6 +22,11 @@ from app.models.enums import PropertyType, Purpose, Urgency
 # 這道防線是在擋模型偶爾多打幾個零 —— 「2000 萬」寫成 200 億這種錯誤，
 # 格式上完全合法，只有數值範圍檢查抓得到。
 MAX_BUDGET = 1_000_000_000
+
+# 跟進建議最多引用幾條客戶說過的話。
+# 上限存在的理由是可讀性（畫面上列十條沒有人會看），不是正確性 ——
+# 所以超過時截斷，不是把整則建議退回。
+MAX_EVIDENCE = 5
 
 
 class ParsedRequirement(BaseModel):
@@ -118,9 +123,29 @@ class FollowUpSuggestion(BaseModel):
     # strict schema 保證模型一定會回這個欄位，沒引用任何東西時是空陣列。
     # 「沒有引用」與「沒有這個欄位」是兩件事，型別上也該分得開。
     evidence: list[str] = Field(
-        max_length=5,
+        max_length=MAX_EVIDENCE,
         description="話術引用到的客戶資訊，逐字取自客戶原話或互動紀錄；沒有引用就是空陣列",
     )
+
+    @field_validator("evidence", mode="before")
+    @classmethod
+    def truncate_evidence(cls, value):
+        """超過上限就截斷，不要讓整則建議作廢。
+
+        第一次真的連上模型，12 筆裡就有一筆回了 6 條引用而被擋下來 ——
+        prompt 明明寫了「最多 5 條」，模型還是多給了一條。
+
+        但「多引用一條」根本不是品質問題，業務不會因此少做什麼。
+        用整則作廢去處理一個排版偏好，是明顯不成比例的：
+        使用者看到的是 503，而真正的原因只是模型多列了一項。
+
+        驗證該擋的是**會造成傷害**的東西（空白的建議、負數的預算），
+        不是「跟我想的格式差一點」。這條界線劃錯的代價，
+        是功能在完全正常的情況下也三不五時失敗。
+        """
+        if isinstance(value, list) and len(value) > MAX_EVIDENCE:
+            return value[:MAX_EVIDENCE]
+        return value
 
 
 class FollowUpAnalysisRead(BaseModel):

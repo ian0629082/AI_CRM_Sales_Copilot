@@ -163,6 +163,8 @@ JUDGE_PROMPT = """你是台灣房仲公司的業務主管，正在檢查一則�
    是不是都能在「客戶說過的話」裡找到。
    出現客戶沒說過的物件、路名、價格、職業、家庭狀況 → false
    （建議業務「去問客戶某件事」不算捏造，那是在承認資訊不足）
+   （用「客戶姓名」那一欄給的稱呼叫他，也**不算**捏造 ——
+     那是 CRM 裡本來就有的資料，只是客戶不會在講需求時報自己的名字）
 
 comment 用一句話說明你最在意的問題，沒問題就寫「無」。
 
@@ -181,11 +183,19 @@ JUDGE_SCHEMA = {
 }
 
 
-def judge_case(provider: OpenAIProvider, suggestion: dict, source_text: str) -> dict | None:
+def judge_case(
+    provider: OpenAIProvider, suggestion: dict, source_text: str, lead_name: str
+) -> dict | None:
     """讓另一次模型呼叫來評這則建議。
 
-    Judge 只拿到「客戶說過的話」與「建議」，**拿不到分數、狀態、逾期天數** ——
+    Judge 只拿到「客戶姓名」「客戶說過的話」與「建議」，
+    **拿不到分數、狀態、逾期天數** ——
     給越多背景，它越容易被那些數字說服而放過內容本身。
+
+    姓名一定要給。第一輪評估沒給，判官就把「李先生您好」判成捏造，
+    理由是「客戶原話裡沒有名字」—— 它說得沒錯，但客戶本來就不會在
+    講需求時報自己的名字，那是 CRM 欄位裡的資料。
+    判官只能依據你給它的東西判斷，少給一樣，它就會穩定地誤判一整類案例。
 
     刻意用另一個 prompt 而不是叫同一個 service 再跑一次：
     判官跟被評估的對象要是兩個角色，否則它只是在確認自己剛剛寫的東西。
@@ -193,6 +203,7 @@ def judge_case(provider: OpenAIProvider, suggestion: dict, source_text: str) -> 
     所以 Judge 的數字只能看趨勢，要引用得先用人工抽樣校準過。
     """
     user_prompt = (
+        f"【客戶姓名】\n{lead_name}\n\n"
         f"【客戶說過的話】\n{source_text}\n\n"
         f"【建議】\n"
         f"下一步：{suggestion.get('next_action', '')}\n"
@@ -253,7 +264,9 @@ def run_case(advisor: FollowUpAdvisor, judge_provider, case: dict):
     )
 
     if judge_provider is not None:
-        result.judge = judge_case(judge_provider, raw, build_source_text(lead, recent))
+        result.judge = judge_case(
+            judge_provider, raw, build_source_text(lead, recent), lead.name
+        )
 
     return result, None, usage
 

@@ -142,7 +142,7 @@ def test_metadata_and_score_snapshot_are_recorded(advice_client):
     assert body["analysis_type"] == "FOLLOW_UP"
     # 寫死版號而不是引用常數：改了預設 prompt 就該讓這個測試紅一次，
     # 逼人確認「這次改版有跑過評估嗎」。
-    assert body["prompt_version"] == "follow_up_v1"
+    assert body["prompt_version"] == "follow_up_v3"
     assert body["model"] == "fake-model"
     assert body["prompt_tokens"] == 300
     assert body["latency_ms"] is not None
@@ -200,6 +200,22 @@ def test_evidence_may_come_from_interactions(advice_client, fake_llm):
     body = _suggest(advice_client, lead["id"]).json()["suggestion"]
 
     assert body["parsed_result"]["evidence"] == ["週末想看七期那間"]
+
+
+def test_too_many_quotes_are_truncated_not_rejected(advice_client, fake_llm):
+    """引用超過 5 條要截斷，不能讓整則建議作廢。
+
+    第一次真的連上模型，12 筆裡就有一筆回了 6 條而被擋下來，
+    但「多引用一條」根本不是品質問題 —— 用整則作廢去處理一個排版偏好，
+    使用者看到的是 503，而真正的原因只是模型多列了一項。
+    """
+    fake_llm.content = _suggestion_json(evidence=["下個月要過去上班"] * 6)
+    lead = _create_lead(advice_client)
+
+    resp = _suggest(advice_client, lead["id"])
+
+    assert resp.status_code == 200
+    assert len(resp.json()["suggestion"]["parsed_result"]["evidence"]) == 5
 
 
 def test_paraphrased_evidence_counts_as_fabrication(advice_client, fake_llm):

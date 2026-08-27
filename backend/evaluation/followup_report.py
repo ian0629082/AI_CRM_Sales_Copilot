@@ -16,7 +16,6 @@ from evaluation.followup_criteria import (
     CRITERIA_LABELS,
     CRITERIA_ORDER,
     FollowUpReport,
-    Verdict,
 )
 
 
@@ -34,7 +33,11 @@ def render_followup_markdown(
     add("")
     add(f"- 產生時間：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
     add(f"- Prompt 版本：`{report.prompt_version}`")
-    add(f"- 情境資料集：v{dataset_version}，{len(report.cases)} 筆")
+    total = len(report.cases) + len(report.failed_cases)
+    add(
+        f"- 情境資料集：{dataset_version}，{total} 筆"
+        + (f"（{len(report.failed_cases)} 筆執行失敗，未計入統計）" if report.failed_cases else "")
+    )
     add("")
 
     add("> 這份評估**沒有標準答案可以比對**。")
