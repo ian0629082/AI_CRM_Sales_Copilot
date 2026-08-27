@@ -89,12 +89,30 @@ DATASETS = {
 EVAL_TODAY = date(2026, 1, 15)
 
 
+def resolve_today(dataset: dict) -> date:
+    """這一份資料集要用哪一天當「今天」。
+
+    holdout 是照日期填的（見 holdout_form.txt 最上面那行「今天：」），
+    而互動紀錄的**內容裡**也會出現日期 ——
+    「約好 8/28 下午三點帶看」。
+
+    若評估硬用 2026-01-15 當今天，模型會同時看到
+    「今天是 2026-01-15」與「約好 8/28 帶看」，兩者對不起來。
+    那不是模型的錯，是我們餵了自相矛盾的資料進去。
+
+    所以資料集有寫基準日就用它的。這仍然是可重現的 ——
+    基準日存在檔案裡，不是執行當天的日期。
+    """
+    stamped = dataset.get("meta", {}).get("form_today")
+    return date.fromisoformat(stamped) if stamped else EVAL_TODAY
+
+
 # ----------------------------------------------------------------------
 # 把 JSON 情境變成 model 物件
 # ----------------------------------------------------------------------
 
 
-def build_lead(case: dict) -> Lead:
+def build_lead(case: dict, today: date) -> Lead:
     """組出一個沒有進資料庫的 Lead。
 
     SQLAlchemy 的 Column default 只在 INSERT 時才套用，
@@ -103,18 +121,18 @@ def build_lead(case: dict) -> Lead:
     漏掉一個的症狀是分數莫名其妙少幾分，而且很難查。
     """
     data = case["lead"]
-    created = EVAL_TODAY - timedelta(days=case.get("days_since_created", 1))
+    created = today - timedelta(days=case.get("days_since_created", 1))
 
     next_follow_up = None
     if "next_follow_up_in_days" in case:
-        next_follow_up = EVAL_TODAY + timedelta(days=case["next_follow_up_in_days"])
+        next_follow_up = today + timedelta(days=case["next_follow_up_in_days"])
 
     # 已約帶看。情境檔寫「幾天後、幾點」，這裡換成實際的 datetime——
     # 資料集裡寫死日期的話，每次改 EVAL_TODAY 就要全部重算一次。
     viewing_at = None
     if "viewing_in_days" in case:
         viewing_at = datetime.combine(
-            EVAL_TODAY + timedelta(days=case["viewing_in_days"]),
+            today + timedelta(days=case["viewing_in_days"]),
             datetime.min.time().replace(hour=case.get("viewing_hour", 14)),
         )
 
@@ -145,7 +163,7 @@ def build_lead(case: dict) -> Lead:
     return lead
 
 
-def build_interactions(case: dict) -> list[Interaction]:
+def build_interactions(case: dict, today: date) -> list[Interaction]:
     """互動紀錄由新到舊，跟正式流程從資料庫撈出來的順序一致。
 
     順序不能弄反：advisor 只取前 MAX_INTERACTIONS 筆，
@@ -160,7 +178,7 @@ def build_interactions(case: dict) -> list[Interaction]:
             content=raw["content"],
         )
         item.created_at = datetime.combine(
-            EVAL_TODAY - timedelta(days=raw["days_ago"]), datetime.min.time()
+            today - timedelta(days=raw["days_ago"]), datetime.min.time()
         )
         items.append(item)
     return sorted(items, key=lambda i: i.created_at, reverse=True)
@@ -249,17 +267,17 @@ def judge_case(
 # ----------------------------------------------------------------------
 
 
-def run_case(advisor: FollowUpAdvisor, judge_provider, case: dict):
+def run_case(advisor: FollowUpAdvisor, judge_provider, case: dict, today: date):
     """跑一筆情境。回傳 (結果, 失敗原因, 用量)。"""
     usage = {"prompt_tokens": 0, "completion_tokens": 0, "latency_ms": None}
-    lead = build_lead(case)
-    interactions = build_interactions(case)
+    lead = build_lead(case, today)
+    interactions = build_interactions(case, today)
 
     score = calculate_score(lead)
-    status = follow_up.evaluate(lead, interactions, EVAL_TODAY)
+    status = follow_up.evaluate(lead, interactions, today)
 
     try:
-        outcome = advisor.suggest(lead, interactions, score, status, EVAL_TODAY)
+        outcome = advisor.suggest(lead, interactions, score, status, today)
     except AIServiceError as exc:
         return None, (case["id"], str(exc.message)), usage
 
@@ -329,6 +347,7 @@ def main() -> int:
 
     dataset = json.loads(DATASETS[args.dataset].read_text(encoding="utf-8"))
     cases = dataset["cases"][: args.limit] if args.limit else dataset["cases"]
+    today = resolve_today(dataset)
 
     # 範本還沒填就跑，只會得到一份看起來很正常、其實毫無意義的報告。
     # 擋在這裡，而不是讓人事後才發現姓名全都是空字串。
@@ -355,7 +374,7 @@ def main() -> int:
 
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
         outputs = list(
-            pool.map(lambda c: run_case(advisor, provider if args.judge else None, c), cases)
+            pool.map(lambda c: run_case(advisor, provider if args.judge else None, c, today), cases)
         )
 
     results = [r for r, _, _ in outputs if r is not None]

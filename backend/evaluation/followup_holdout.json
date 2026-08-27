@@ -1,10 +1,11 @@
 {
   "meta": {
     "version": "v1",
-    "case_count": 1,
+    "case_count": 5,
     "purpose": "跟進建議的 held-out 驗證集",
     "source": "由具房仲業務實務經驗、且未讀過 prompt 的人出題",
     "generated_from": "holdout_form.txt",
+    "form_today": "2026-08-27",
     "how_to_read": [
       "這份**只用來量測，永遠不拿來調 prompt**。",
       "它的全部價值來自「從沒影響過任何決定」——",
@@ -17,22 +18,139 @@
     {
       "id": "hold-001",
       "tags": [],
-      "days_since_created": 1,
+      "days_since_created": 2,
       "lead": {
-        "name": "王先生",
-        "status": "NEW",
-        "phone": "0912345678",
-        "location": "台中市南區",
-        "budget_min": 18000000,
-        "budget_max": 25000000,
-        "rooms": 4,
+        "name": "胡小姐",
+        "status": "CONTACTED",
+        "phone": "0923456789",
+        "raw_requirement": "我要找大里區透天，家門前要有車庫，地坪需要30坪以上，屋齡不限，預算1500萬左右。",
+        "location": "台中市大里區",
+        "budget_max": 15000000,
+        "property_type": "TOWNHOUSE",
+        "parking": true,
+        "purpose": "SELF_USE"
+      },
+      "interactions": [
+        {
+          "type": "CALL",
+          "days_ago": 2,
+          "content": "已聯繫上，詢問需求後，有適合案件會再與客戶連絡"
+        }
+      ]
+    },
+    {
+      "id": "hold-002",
+      "tags": [],
+      "days_since_created": 31,
+      "lead": {
+        "name": "陳太太",
+        "status": "INTERESTED",
+        "phone": "0924567893",
+        "raw_requirement": "我要找城市之星這個社區，因為我家人目前也住這個社區，我找2~3房，不需要車位，我大概知道社區的行情，只要不要超過行情太多我都可以接受。",
+        "location": "台中市大里區",
+        "rooms": 2,
         "property_type": "ELEVATOR_BUILDING",
+        "parking": false,
+        "purpose": "SELF_USE"
+      },
+      "interactions": [
+        {
+          "type": "LINE",
+          "days_ago": 7,
+          "content": "有介紹城市之星社區的8樓的兩房與12樓的三房給她，約好8/24下午14:00帶看"
+        },
+        {
+          "type": "VIEWING",
+          "days_ago": 3,
+          "content": "帶看完後表示比較喜歡12樓的三房，回去評估一下"
+        }
+      ]
+    },
+    {
+      "id": "hold-003",
+      "tags": [],
+      "days_since_created": 17,
+      "lead": {
+        "name": "吳先生",
+        "status": "INTERESTED",
+        "phone": "0925678911",
+        "raw_requirement": "我要找西區的大樓，希望找3房的房型，預算1000萬左右，所以屋齡舊一點沒有關係，沒有車位的也可以看。",
+        "location": "台中市西區",
+        "budget_max": 10000000,
+        "rooms": 3,
+        "property_type": "ELEVATOR_BUILDING",
+        "parking": false,
+        "purpose": "SELF_USE"
+      },
+      "interactions": [
+        {
+          "type": "LINE",
+          "days_ago": 13,
+          "content": "傳了三間西區的大樓給他，他表示有興趣，約好8/28下午15:00帶看"
+        }
+      ],
+      "viewing_in_days": 1,
+      "viewing_hour": 15
+    },
+    {
+      "id": "hold-004",
+      "tags": [],
+      "days_since_created": 26,
+      "lead": {
+        "name": "周杰倫",
+        "status": "NEGOTIATING",
+        "phone": "0919187258",
+        "raw_requirement": "我要找西屯區靠近逢甲大學的電梯別墅，預算有4000萬，希望屋齡新一點的，我有兩部車，有獨棟的最好。",
+        "location": "台中市西屯區",
+        "budget_max": 40000000,
+        "property_type": "VILLA",
         "building_age_max": 10,
         "parking": true,
         "purpose": "SELF_USE"
       },
-      "interactions": [],
-      "next_follow_up_in_days": -1
+      "interactions": [
+        {
+          "type": "VIEWING",
+          "days_ago": 7,
+          "content": "有評估福星路的獨棟電梯別墅，口頭有出3700萬，再回去跟家人討論"
+        },
+        {
+          "type": "CALL",
+          "days_ago": 5,
+          "content": "追蹤客戶表示有明確想賣，約隔天碰面收斡旋"
+        },
+        {
+          "type": "MEETING",
+          "days_ago": 4,
+          "content": "最後收3750萬的斡旋，約好8/29號要到公司與屋主碰面喬價格"
+        }
+      ],
+      "next_follow_up_in_days": 1
+    },
+    {
+      "id": "hold-005",
+      "tags": [],
+      "days_since_created": 22,
+      "lead": {
+        "name": "張老闆",
+        "status": "MEETING",
+        "phone": "0909090099",
+        "raw_requirement": "我手上有一筆資金，想盡快找到產品置產，要找中山醫附近的收租套房，至少要有10間，投報率希望有5%以上，預算1500萬左右。",
+        "location": "台中市南區",
+        "budget_max": 15000000,
+        "rooms": 10,
+        "property_type": "STUDIO",
+        "purpose": "INVESTMENT",
+        "urgency": "HIGH"
+      },
+      "interactions": [
+        {
+          "type": "CALL",
+          "days_ago": 2,
+          "content": "介紹了2間獨棟的電梯套房，張老闆希望我8/29下午拿資料過去給他參考"
+        }
+      ],
+      "next_follow_up_in_days": 1
     }
   ]
 }

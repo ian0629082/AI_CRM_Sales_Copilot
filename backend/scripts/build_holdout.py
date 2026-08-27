@@ -40,6 +40,16 @@ STATUS = {
     "已聯絡": "CONTACTED",
     "聯絡過": "CONTACTED",
     "有興趣": "INTERESTED",
+    # 「帶看」「約訪」是業務實際會講的階段，但目前的漏斗沒有這兩格。
+    #
+    # 出題的人（有房仲實務經驗）自然而然就寫了這兩個詞，而且不是筆誤 ——
+    # 他填五筆就用掉兩個。這代表漏斗是照規劃書設計的，不是照真實流程設計的。
+    #
+    # 暫時對應到最接近的既有狀態，讓資料先能用。
+    # 漏斗要不要改成「新進→已聯絡→約訪→帶看→斡旋→成交」是另一個決定，
+    # 那要動 migration、前端、Demo 資料，不該夾在填表的過程中做。
+    "帶看": "INTERESTED",  # 約好帶看但還沒去，仍然屬於「有興趣」階段
+    "約訪": "MEETING",  # 約好碰面
     "面談": "MEETING",
     # 買方這一端叫「斡旋」：客戶下了斡旋金，等仲介去跟屋主談。
     # 「議價」是殺價，那是對屋主做的事，買方 CRM 不會用到這個詞 ——
@@ -66,7 +76,19 @@ PURPOSE = {"自住": "SELF_USE", "投資": "INVESTMENT", "兩者": "BOTH", "都�
 
 URGENCY = {"急": "HIGH", "很急": "HIGH", "不急": "LOW"}
 
-PARKING = {"要": True, "需要": True, "不要": False, "不需要": False}
+# 「不要」「不用」「不需要」要排在「要」前面比對。
+# pick() 是用「這個詞有沒有出現在文字裡」判斷的，
+# 「不要」裡面就含著「要」—— 順序寫反的話，客戶說不用車位會變成要車位，
+# 而那筆客戶的建議就會整段建立在錯的前提上。
+PARKING = {
+    "不要": False,
+    "不用": False,
+    "不需要": False,
+    "沒有": False,
+    "要": True,
+    "需要": True,
+    "有": True,
+}
 
 INTERACTION_TYPE = {
     "電話": "CALL",
@@ -165,6 +187,16 @@ def parse_days_ago(text: str, anchor: date) -> int | None:
     return None
 
 
+# 「2000萬左右」跟「就是 2000 萬」在計分上差 10 分：
+# 講概數的客戶通常還在觀望。Lead Score 分得出這兩種，
+# 表格這邊也要分得出來，否則 holdout 的分數會整體偏高。
+_APPROXIMATE_WORDS = ("左右", "上下", "大概", "差不多", "附近", "約")
+
+
+def is_approximate_budget(text: str) -> bool:
+    return any(word in text for word in _APPROXIMATE_WORDS)
+
+
 def parse_money(text: str) -> tuple[int | None, int | None]:
     """把「1500萬」「1200萬到1500萬」換算成元。
 
@@ -174,6 +206,12 @@ def parse_money(text: str) -> tuple[int | None, int | None]:
     text = text.strip()
     if not text:
         return None, None
+
+    # 業務講預算的方式，程式要跟著他走。
+    # 「4000萬內」「不超過4000萬」「頂多4000萬」都是「上限4000萬」，
+    # 逼人改成「4000萬」只是要他配合程式的想法。
+    text = re.sub(r"^(不超過|頂多|最多|上限)\s*", "", text)
+    text = re.sub(r"\s*(以內|以下|內|上限|左右|上下|大概|差不多|附近)$", "", text).strip()
 
     parts = re.split(r"到|~|-|～", text)
 
@@ -379,7 +417,8 @@ def parse_block(
             return None
         raise FormError("有填其他欄位但沒填姓名")
 
-    budget_min, budget_max = parse_money(fields.get("預算", ""))
+    budget_text = fields.get("預算", "")
+    budget_min, budget_max = parse_money(budget_text)
 
     lead: dict = {
         "name": name,
@@ -401,6 +440,9 @@ def parse_block(
     # 沒填的欄位整個不放進去，而不是填 null。
     # 「客戶沒提到」在計分上跟「沒有這個鍵」是同一件事，少一堆 null 也好讀得多。
     lead.update({k: v for k, v in optional.items() if v not in (None, "")})
+
+    if budget_max is not None and is_approximate_budget(budget_text):
+        lead["budget_is_approximate"] = True
 
     # 建檔日期收兩種寫法。「建檔幾天了」是舊版表格的欄位，
     # 已經填過的人不該因為表格改版就得重填。
