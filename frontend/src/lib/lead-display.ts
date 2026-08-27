@@ -31,7 +31,7 @@ export const LEAD_STATUS_LABEL: Record<LeadStatus, string> = {
   CONTACTED: "已聯絡",
   INTERESTED: "有興趣",
   MEETING: "已約訪",
-  NEGOTIATING: "議價中",
+  NEGOTIATING: "斡旋中",
   WON: "成交",
   LOST: "流失",
 };

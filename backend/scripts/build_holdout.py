@@ -41,6 +41,11 @@ STATUS = {
     "聯絡過": "CONTACTED",
     "有興趣": "INTERESTED",
     "面談": "MEETING",
+    # 買方這一端叫「斡旋」：客戶下了斡旋金，等仲介去跟屋主談。
+    # 「議價」是殺價，那是對屋主做的事，買方 CRM 不會用到這個詞 ——
+    # 資料庫裡的值仍然是 NEGOTIATING（改 enum 要動 migration，
+    # 而這是用詞問題不是資料問題），但畫面與表格一律講斡旋。
+    "斡旋": "NEGOTIATING",
     "議價": "NEGOTIATING",
     "成交": "WON",
     "流失": "LOST",

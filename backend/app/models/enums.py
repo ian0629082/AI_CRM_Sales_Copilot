@@ -13,6 +13,11 @@ class LeadStatus(str, Enum):
     CONTACTED = "CONTACTED"
     INTERESTED = "INTERESTED"
     MEETING = "MEETING"
+    # 買方下了斡旋金，等仲介去跟屋主談。畫面上顯示「斡旋中」。
+    #
+    # 不叫「議價」是因為那是**對屋主**做的事（殺價），
+    # 買方端不會有議價的需求。這個 CRM 目前只管買方，用錯詞的話，
+    # 業務看到那一格會以為是屋主端的資料。
     NEGOTIATING = "NEGOTIATING"
     WON = "WON"
     LOST = "LOST"  # 規劃書的漏斗只畫到 WON，但要算 Conversion Rate 就必須有終止狀態
