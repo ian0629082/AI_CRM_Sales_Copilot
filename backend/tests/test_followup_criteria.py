@@ -332,3 +332,26 @@ def test_no_viewing_tomorrow_is_not_applicable():
     """這條判準只在帶看前一天有意義，其他日子不適用。"""
     result = check_viewing_confirmed("致電了解他的需求", "您好⋯⋯", False)
     assert result.verdict is Verdict.NOT_APPLICABLE
+
+
+def test_wrapping_quotes_are_not_fabrication():
+    """模型自己加的一對引號不算捏造。
+
+    這條是**在看過 holdout 的失敗之後才加的**，所以要講清楚它為什麼
+    不是「數字不好看就放寬標準」：
+
+    判斷的標準只有一條 —— 改完之後會不會放過真正的捏造？
+    不會。拿掉的只有最外層引號，內容仍然必須逐字相符。
+    """
+    assert check_grounding(["「下個月要過去上班」"], SOURCE).verdict is Verdict.PASS
+
+
+def test_only_the_outermost_quotes_are_stripped():
+    """句子中間的引號是內容的一部分，不能拿掉。
+
+    客戶說「他跟我說『再看看』」，那個『再看看』是他真的講過的字。
+    連中間的引號都脫掉的話，這條判準就會開始放過改寫過的句子。
+    """
+    source = "客戶說他跟我說『再看看』就掛了"
+    assert check_grounding(["他跟我說『再看看』"], source).verdict is Verdict.PASS
+    assert check_grounding(["他跟我說再看看"], source).verdict is Verdict.FAIL

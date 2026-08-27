@@ -81,9 +81,35 @@ class CriterionResult:
     detail: str = ""
 
 
+# 模型有時會自己在引用外面加一對引號來表示「這是引述」。
+# 那對符號是它的排版習慣，不是它引用的內容。
+_WRAPPING_QUOTES = "「」『』\"'“”‘’"
+
+
 def normalize(text: str) -> str:
-    """比對前把空白拿掉。與 follow_up_advisor 用同一條規則。"""
-    return "".join(text.split())
+    """比對前把空白與首尾引號拿掉。與 follow_up_advisor 用同一條規則。
+
+    ### 首尾引號這條是**在看過 holdout 的失敗之後才加的**
+
+    這件事必須寫在這裡，因為「數字不好看就放寬判準」正是這個動作的形狀。
+
+    當時 holdout 有一筆判成捏造，內容是：
+
+        模型引用：「我要找城市之星這個社區，因為我家人也住這個社區⋯⋯」
+        來源原文： 我要找城市之星這個社區，因為我家人也住這個社區⋯⋯
+
+    一字不差，只差首尾那對「」。
+
+    判斷「這是修正誤判還是放寬標準」的標準只有一條：
+    **改完之後，這條判準會不會放過真正的捏造？**
+    不會 —— 拿掉的只有最外層的引號，內容仍然必須逐字相符。
+    改寫一個字、接兩句話、引用系統整理過的欄位，全部照樣判失敗。
+
+    只脫最外層，不脫中間的。句子中間出現的引號是內容的一部分：
+    客戶說「他說『再看看』」，那個『再看看』不能被拿掉。
+    """
+    stripped = "".join(text.split())
+    return stripped.strip(_WRAPPING_QUOTES)
 
 
 def check_grounding(evidence: list[str], source_text: str) -> CriterionResult:
