@@ -77,6 +77,21 @@ export function useAnalyzeLead(id: number) {
   });
 }
 
+/**
+ * 請 AI 給一則跟進建議。
+ *
+ * 刻意**不**讓任何快取失效：這支 API 不會改動客戶的欄位，
+ * 讓 lead 重新抓一次只是白跑一趟。
+ * 建議本身留在 mutation 的 data 裡就好，畫面直接讀那個。
+ */
+export function useSuggestFollowUp(id: number) {
+  return useMutation({
+    mutationFn: () => leadsApi.suggestFollowUp(id),
+    // 跟 useAnalyzeLead 同樣不自動重試：每一次呼叫都會真的花錢。
+    retry: false,
+  });
+}
+
 export function useDeleteLead() {
   const queryClient = useQueryClient();
   return useMutation({

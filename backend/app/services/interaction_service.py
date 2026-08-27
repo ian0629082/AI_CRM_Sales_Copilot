@@ -51,7 +51,11 @@ class InteractionService:
                 # 這兩個是「要怎麼安排提醒」的指令，不是互動紀錄的內容，
                 # 所以不進 Interaction 這張表
                 **payload.model_dump(
-                    exclude={"next_follow_up_days", "mute_follow_up"}
+                    exclude={
+                        "next_follow_up_days",
+                        "mute_follow_up",
+                        "viewing_scheduled_at",
+                    }
                 ),
             )
         )
@@ -75,6 +79,13 @@ class InteractionService:
         業務有填就用他填的，沒填就用該互動類型的預設值。
         規則在這裡只是「建議」，不是「決定」—— 業務永遠可以覆蓋。
         """
+        # 這次談定了帶看時間就記下來。
+        #
+        # 沒帶這個欄位代表「這次沒談到帶看」，不動原本已經約好的時間 ——
+        # 業務補記一通不相干的電話，不該把客戶的看屋約洗掉。
+        if payload.viewing_scheduled_at is not None:
+            lead.viewing_scheduled_at = payload.viewing_scheduled_at
+
         if payload.mute_follow_up:
             lead.follow_up_muted = True
             lead.next_follow_up_at = None

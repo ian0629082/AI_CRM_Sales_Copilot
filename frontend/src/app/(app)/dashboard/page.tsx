@@ -138,7 +138,9 @@ export default function DashboardPage() {
   const conversionRate = closed > 0 ? Math.round((won / closed) * 100) : null;
 
   const needFollowUp =
-    (followUps?.new_uncontacted.length ?? 0) + (followUps?.due.length ?? 0);
+    (followUps?.viewing_confirm.length ?? 0) +
+    (followUps?.new_uncontacted.length ?? 0) +
+    (followUps?.due.length ?? 0);
 
   const funnel = LEAD_STATUS_ORDER.map((status) => ({
     status,
@@ -166,7 +168,15 @@ export default function DashboardPage() {
           value={needFollowUp}
           hint={
             followUps
-              ? `新進 ${followUps.new_uncontacted.length}・到期 ${followUps.due.length}`
+              ? [
+                  followUps.viewing_confirm.length > 0
+                    ? `帶看確認 ${followUps.viewing_confirm.length}`
+                    : null,
+                  `新進 ${followUps.new_uncontacted.length}`,
+                  `到期 ${followUps.due.length}`,
+                ]
+                  .filter(Boolean)
+                  .join("・")
               : undefined
           }
           accent={needFollowUp > 0 ? "text-amber-600 dark:text-amber-400" : ""}
@@ -181,6 +191,19 @@ export default function DashboardPage() {
           }
         />
       </div>
+
+      {/* 帶看確認獨立一區，而且排在最上面、佔滿整行。
+          它跟下面兩堆的差別是「漏掉的代價」：
+          少打一通跟進電話是少一次接觸，漏掉帶看確認是白跑一趟，
+          而那個下午本來可以帶另一組客戶。 */}
+      {followUps && followUps.viewing_confirm.length > 0 ? (
+        <FollowUpList
+          title="📅 明天帶看，今天要確認"
+          description="先傳個 LINE 或打通電話跟客戶確認。客戶臨時有事沒講，你就白跑一趟。"
+          items={followUps.viewing_confirm}
+          emptyText=""
+        />
+      ) : null}
 
       {/* 兩堆刻意分開顯示。
           「還沒有人聯絡過」跟「聯絡過但太久沒動」對應兩種不同的業務動作：

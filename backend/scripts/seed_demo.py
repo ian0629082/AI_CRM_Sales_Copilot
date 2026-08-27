@@ -180,9 +180,10 @@ LEADS: list[dict] = [
         ],
         follow_up=1,
     ),
+    # ---------- 已帶看 ----------
     dict(
         name="王俊傑", phone="0912345013", source=LeadSource.WALK_IN,
-        status=LeadStatus.MEETING, created_days_ago=30,
+        status=LeadStatus.VIEWING, created_days_ago=30,
         raw="想看西區華廈，四房，預算3200萬，屋齡15年內，太太希望有管理員",
         fields=dict(location="西區", budget_max=32000000, rooms=4,
                     property_type=PropertyType.LOW_RISE, building_age_max=15,
@@ -193,6 +194,22 @@ LEADS: list[dict] = [
             (InteractionType.MEETING, "夫妻一起到店，討論其中兩間", 3),
         ],
         follow_up=0,
+    ),
+    dict(
+        name="邱雅琴", phone="0912345020", source=LeadSource.LINE,
+        status=LeadStatus.VIEWING, created_days_ago=16,
+        raw="北屯三房，預算2000萬以內，屋齡10年內，先生開車要平面車位",
+        fields=dict(location="北屯", budget_max=20000000, rooms=3,
+                    building_age_max=10, parking=True,
+                    purpose=Purpose.SELF_USE, urgency=Urgency.HIGH),
+        interactions=[
+            (InteractionType.LINE, "傳北屯四間給她，她挑了兩間想看", 6),
+            (InteractionType.VIEWING, "帶看北屯兩間，喜歡其中一間但嫌坪數小一點", 4),
+            (InteractionType.CALL, "約好再看同社區另一戶", 1),
+        ],
+        follow_up=3,
+        # 明天下午三點帶看 —— Dashboard 上「今天要確認」那一區靠這筆才有東西
+        viewing=(1, 15),
     ),
 
     # ---------- 議價中 ----------
@@ -315,6 +332,19 @@ def build(db, owner: User) -> int:
             lead.follow_up_muted = True
         elif isinstance(follow_up, int):
             lead.next_follow_up_at = today + timedelta(days=follow_up)
+
+        # 已約帶看：(幾天後, 幾點)。
+        # Demo 一定要有一筆「明天帶看」，否則 Dashboard 上
+        # 「明天帶看，今天要確認」那一區永遠是空的 ——
+        # 面試官打開看不到這個功能存在。
+        viewing = spec.get("viewing")
+        if viewing is not None:
+            days, hour = viewing
+            lead.viewing_scheduled_at = datetime.combine(
+                today + timedelta(days=days),
+                datetime.min.time().replace(hour=hour),
+                tzinfo=timezone.utc,
+            )
 
         # 分數由同一套規則算出來，不是寫死的 ——
         # 否則調整權重之後，Demo 資料會跟系統的實際行為對不上。

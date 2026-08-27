@@ -22,6 +22,10 @@ export type FollowUpItem = Schemas["FollowUpItem"];
 export type FollowUpResponse = Schemas["FollowUpResponse"];
 export type LeadAnalyzeResponse = Schemas["LeadAnalyzeResponse"];
 
+export type FollowUpSuggestion = Schemas["FollowUpSuggestion"];
+export type FollowUpAnalysis = Schemas["FollowUpAnalysisRead"];
+export type LeadFollowUpResponse = Schemas["LeadFollowUpResponse"];
+
 export type Interaction = Schemas["InteractionRead"];
 export type InteractionCreate = Schemas["InteractionCreate"];
 

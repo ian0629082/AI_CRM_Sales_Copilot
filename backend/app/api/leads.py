@@ -7,7 +7,7 @@
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_ai_service, get_current_user
+from app.api.deps import get_ai_service, get_current_user, get_follow_up_advisor
 from app.db.database import get_db
 from app.models.enums import LeadStatus
 from app.models.user import User
@@ -17,11 +17,13 @@ from app.schemas.lead import (
     LeadAnalyzeResponse,
     LeadCreate,
     LeadDetail,
+    LeadFollowUpResponse,
     LeadListResponse,
     LeadRead,
     LeadUpdate,
 )
 from app.services.ai_service import AIService
+from app.services.follow_up_advisor import FollowUpAdvisor
 from app.services.lead_service import LeadService
 
 router = APIRouter(prefix="/leads", tags=["leads"])
@@ -31,13 +33,14 @@ def get_lead_service(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     ai_service: AIService | None = Depends(get_ai_service),
+    advisor: FollowUpAdvisor | None = Depends(get_follow_up_advisor),
 ) -> LeadService:
     """把登入者綁進 Service。
 
     授權寫在這個 dependency 裡，而不是每支 route 各寫一次 ——
     少了重複，也就少了某支 API 忘記加保護的可能。
     """
-    return LeadService(db, current_user, ai_service)
+    return LeadService(db, current_user, ai_service, advisor)
 
 
 @router.post("", response_model=LeadRead, status_code=status.HTTP_201_CREATED)
@@ -69,7 +72,7 @@ def list_follow_ups(service: LeadService = Depends(get_lead_service)):
     路由必須註冊在 /{lead_id} 之前，否則 "follow-ups" 會被當成 lead_id
     去比對，然後回一個看起來莫名其妙的 422。
     """
-    new_uncontacted, due, muted_count = service.list_follow_ups()
+    viewing_confirm, new_uncontacted, due, muted_count = service.list_follow_ups()
 
     def to_items(rows):
         return [
@@ -83,6 +86,7 @@ def list_follow_ups(service: LeadService = Depends(get_lead_service)):
         ]
 
     return FollowUpResponse(
+        viewing_confirm=to_items(viewing_confirm),
         new_uncontacted=to_items(new_uncontacted),
         due=to_items(due),
         muted_count=muted_count,
@@ -119,6 +123,26 @@ def analyze_lead(lead_id: int, service: LeadService = Depends(get_lead_service))
     """
     lead, analysis = service.analyze_lead(lead_id)
     return LeadAnalyzeResponse(lead=lead, analysis=analysis)
+
+
+@router.post("/{lead_id}/follow-up-suggestion", response_model=LeadFollowUpResponse)
+def suggest_follow_up(lead_id: int, service: LeadService = Depends(get_lead_service)):
+    """產生一則 AI 跟進建議：下一步動作、建議話術、建議時機。
+
+    由業務按按鈕觸發，同步等待。不做成「打開待跟進頁面就自動全部產生」——
+    一次列表可能有二十位客戶，那就是二十次 API 呼叫，
+    而業務今天其實只會打其中三通。
+
+    **這支 API 不會改動客戶的任何欄位**，包括下次提醒日。
+    建議是參考，不是系統替業務做的決定。
+
+    可能的失敗：
+    - 404 這位客戶不存在（或不是你的）
+    - 422 這位客戶既沒有原始需求也沒有互動紀錄，沒有東西可以據以建議
+    - 503 AI 暫時不可用
+    """
+    _, analysis = service.suggest_follow_up(lead_id)
+    return LeadFollowUpResponse(suggestion=analysis)
 
 
 @router.delete("/{lead_id}", status_code=status.HTTP_204_NO_CONTENT)

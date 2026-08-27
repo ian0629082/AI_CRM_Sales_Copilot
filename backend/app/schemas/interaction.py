@@ -16,6 +16,17 @@ class InteractionCreate(BaseModel):
     # 業務知道的比規則多 —— 客戶說「我下週三再回你」，填 7 就對了。
     next_follow_up_days: int | None = Field(default=None, ge=0, le=365)
 
+    # 這次談定的帶看時間。
+    #
+    # 放在「記錄互動」這裡而不是另外一個頁面，是因為帶看幾乎都是在
+    # 通話或 LINE 裡敲定的 —— 業務寫完「客戶說週六下午可以去看七期那間」，
+    # 順手就把時間填了。多開一個地方要點，就多一個忘記填的理由，
+    # 而這個欄位沒填的代價是白跑一趟。
+    #
+    # 不帶這個欄位代表「這次沒談到帶看」，不會動到原本已經約好的時間。
+    # 要改期或取消請用 PATCH /leads/{id}。
+    viewing_scheduled_at: datetime | None = None
+
     # 明確關閉這位客戶的提醒（成交、流失、確定放棄）。
     # 與「不填 next_follow_up_days」不同：那是「用預設」，這是「不要提醒」。
     #

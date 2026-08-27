@@ -18,7 +18,7 @@ from app.models.enums import (
     Purpose,
     Urgency,
 )
-from app.schemas.ai import AIAnalysisRead
+from app.schemas.ai import AIAnalysisRead, FollowUpAnalysisRead
 from app.schemas.interaction import InteractionRead
 
 
@@ -84,6 +84,9 @@ class LeadUpdate(BaseModel):
 
     # 業務可以隨時直接改提醒日或關掉提醒，不必透過新增互動
     next_follow_up_at: date | None = None
+    # 帶看改期或取消也走這裡。傳 null 代表取消（那筆帶看不算數了），
+    # 這跟「不帶這個欄位」不同 —— PATCH 用 exclude_unset 分得開兩者。
+    viewing_scheduled_at: datetime | None = None
     follow_up_muted: bool | None = None
 
 
@@ -113,6 +116,7 @@ class LeadRead(BaseModel):
     urgency: Urgency | None
 
     next_follow_up_at: date | None
+    viewing_scheduled_at: datetime | None
     follow_up_muted: bool
 
     lead_score: int | None
@@ -163,6 +167,9 @@ class FollowUpResponse(BaseModel):
     分不出哪些是還沒認識、哪些是快跑掉了。
     """
 
+    # 明天要帶看，今天得先確認。排在最前面，因為漏掉的代價最高 ——
+    # 客戶臨時有事沒講，業務白跑一趟，而那個下午本來可以帶另一組客戶。
+    viewing_confirm: list[FollowUpItem]
     new_uncontacted: list[FollowUpItem]
     due: list[FollowUpItem]
     # 業務主動關掉提醒的客戶數。
@@ -186,6 +193,8 @@ class LeadDetail(LeadRead):
     # 最近一次 AI 解析。前端靠它決定哪些欄位要掛「AI 解析」徽章，
     # 重新整理頁面後徽章也還在（不是只存在前端記憶體裡的狀態）。
     latest_analysis: AIAnalysisRead | None = None
+    # 最近一則 AI 跟進建議。重新整理後仍然看得到，不必再花一次錢重產。
+    latest_follow_up: FollowUpAnalysisRead | None = None
 
 
 class LeadAnalyzeResponse(BaseModel):
@@ -197,3 +206,14 @@ class LeadAnalyzeResponse(BaseModel):
 
     lead: LeadRead
     analysis: AIAnalysisRead
+
+
+class LeadFollowUpResponse(BaseModel):
+    """POST /leads/{id}/follow-up-suggestion 的回應。
+
+    只回建議，不回 lead —— 因為產生建議不會改到客戶的任何欄位，
+    前端手上那份資料仍然是對的，沒必要多傳一份回去。
+    這跟 analyze 的回應刻意不一樣，差異本身就在說明兩支 API 的性質不同。
+    """
+
+    suggestion: FollowUpAnalysisRead

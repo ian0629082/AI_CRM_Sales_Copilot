@@ -25,6 +25,7 @@ import {
   useAnalyzeLead,
   useDeleteLead,
   useLead,
+  useSuggestFollowUp,
   useUpdateLead,
 } from "@/lib/hooks/use-leads";
 import {
@@ -99,6 +100,17 @@ function isAiFilled(lead: LeadDetail, field: RequirementField): boolean {
   return aiValue !== null && aiValue !== undefined && aiValue === lead[field];
 }
 
+/**
+ * 這個時間點是不是已經過了。
+ *
+ * 跟 isOverdue 不同，這裡要比到「幾點」而不是只比日期：
+ * 今天下午三點的帶看，在今天早上十點看還沒發生 ——
+ * 只比日期的話，業務一早打開頁面就會看到那場約被標成「上次帶看」。
+ */
+function hasPassed(isoDateTime: string): boolean {
+  return new Date(isoDateTime).getTime() < Date.now();
+}
+
 /** 提醒日是不是已經到了或過了。後端用同一條判斷決定要不要進待跟進清單。 */
 function isOverdue(isoDate: string): boolean {
   const today = new Date();
@@ -146,10 +158,13 @@ export default function LeadDetailPage() {
   const deleteLead = useDeleteLead();
   const createInteraction = useCreateInteraction(leadId);
   const analyzeLead = useAnalyzeLead(leadId);
+  const suggestFollowUp = useSuggestFollowUp(leadId);
 
   const [interactionType, setInteractionType] = useState<InteractionType>("CALL");
   const [interactionContent, setInteractionContent] = useState("");
   const [followUpChoice, setFollowUpChoice] = useState(0);
+  // 這次通話有沒有談定帶看時間。空字串代表沒談到，不會動到原本約好的時間。
+  const [viewingAt, setViewingAt] = useState("");
 
   async function handleStatusChange(next: string | null) {
     if (!next) return;
@@ -172,11 +187,18 @@ export default function LeadDetailPage() {
         content: interactionContent.trim(),
         next_follow_up_days: choice.days,
         mute_follow_up: choice.mute ?? null,
+        // datetime-local 給的是沒有時區的字串，交給瀏覽器換成當地時間的 ISO
+        viewing_scheduled_at: viewingAt ? new Date(viewingAt).toISOString() : null,
       });
       setInteractionContent("");
       setFollowUpChoice(0);
+      setViewingAt("");
       toast.success(
-        choice.mute ? "已新增紀錄，並關閉這位客戶的提醒" : "已新增互動紀錄",
+        viewingAt
+          ? "已新增紀錄，帶看前一天會提醒你確認"
+          : choice.mute
+            ? "已新增紀錄，並關閉這位客戶的提醒"
+            : "已新增互動紀錄",
       );
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "新增失敗");
@@ -190,6 +212,46 @@ export default function LeadDetailPage() {
     } catch {
       // 錯誤已經由 mutation 的 isError 狀態接手，在卡片裡就地顯示並附上重試按鈕。
       // 這裡只是避免 unhandled rejection。
+    }
+  }
+
+  async function handleCancelViewing() {
+    // 同一顆按鈕，在「還沒帶看」與「已經帶看完」兩種狀態下做的是不同的事：
+    // 前者是取消一個約（有後果），後者只是清掉一筆過期的紀錄。
+    // 用同一句話問，其中一種一定會讓人困惑。
+    const passed =
+      lead?.viewing_scheduled_at != null && hasPassed(lead.viewing_scheduled_at);
+    const message = passed
+      ? "清除這筆帶看紀錄嗎？"
+      : "取消這筆帶看約嗎？帶看前一天就不會再提醒你確認。";
+
+    if (!window.confirm(message)) {
+      return;
+    }
+    try {
+      await updateLead.mutateAsync({ viewing_scheduled_at: null });
+      toast.success(passed ? "已清除" : "已取消帶看約");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "操作失敗");
+    }
+  }
+
+  async function handleSuggestFollowUp() {
+    try {
+      await suggestFollowUp.mutateAsync();
+    } catch {
+      // 跟 AI 解析一樣，錯誤就地顯示在卡片裡並附重試按鈕
+    }
+  }
+
+  async function handleCopyTalkingPoint(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("話術已複製");
+    } catch {
+      // 瀏覽器可能因為權限或非 HTTPS 而擋下剪貼簿。
+      // 話術本來就顯示在畫面上，選取複製一樣做得到，不必當成錯誤處理。
+      toast.error("無法自動複製，請手動選取文字");
     }
   }
 
@@ -236,6 +298,13 @@ export default function LeadDetailPage() {
       </div>
     );
   }
+
+  // 剛產生的那一則優先；沒有的話顯示上次存下來的，
+  // 這樣重新整理頁面後建議還在，不必再花一次錢重產。
+  const advice = suggestFollowUp.data?.suggestion ?? lead.latest_follow_up;
+  // 既沒有原話也沒有互動紀錄時，模型只能靠猜，後端會直接回 422。
+  // 與其讓使用者按了才看到錯誤，不如一開始就把按鈕關掉。
+  const canSuggest = Boolean(lead.raw_requirement) || lead.interactions.length > 0;
 
   return (
     <div className="space-y-4">
@@ -366,6 +435,115 @@ export default function LeadDetailPage() {
             </CardContent>
           </Card>
 
+          {/* 跟進建議排在需求原話之前。
+              業務打開這一頁想知道的第一件事是「所以我現在該做什麼」，
+              客戶原話是拿來查證的，不是拿來讀的。 */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-base">AI 跟進建議</CardTitle>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSuggestFollowUp}
+                disabled={suggestFollowUp.isPending || !canSuggest}
+              >
+                {suggestFollowUp.isPending
+                  ? "產生中..."
+                  : advice
+                    ? "重新產生"
+                    : "產生建議"}
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {suggestFollowUp.isPending ? (
+                <p className="text-xs text-muted-foreground">
+                  正在讀客戶資料與互動紀錄，大約需要 3～6 秒⋯⋯
+                </p>
+              ) : null}
+
+              {suggestFollowUp.isError ? (
+                <div className="flex flex-wrap items-center gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/40">
+                  <span className="text-amber-900 dark:text-amber-200">
+                    {suggestFollowUp.error instanceof ApiError
+                      ? suggestFollowUp.error.message
+                      : "AI 建議目前無法產生"}
+                  </span>
+                  <Button size="sm" variant="outline" onClick={handleSuggestFollowUp}>
+                    重試
+                  </Button>
+                </div>
+              ) : null}
+
+              {advice?.parsed_result ? (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">下一步動作</p>
+                    <p className="text-sm font-medium">
+                      {advice.parsed_result.next_action}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground">建議話術</p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleCopyTalkingPoint(advice.parsed_result!.talking_point)
+                        }
+                        className="text-xs text-muted-foreground hover:underline"
+                      >
+                        複製
+                      </button>
+                    </div>
+                    {/* 話術是這個功能真正省下時間的那一段，所以給它自己的底色，
+                        而且要能一鍵複製 —— 業務下一個動作就是貼到 LINE 上。 */}
+                    <p className="rounded-md bg-muted p-3 text-sm whitespace-pre-wrap">
+                      {advice.parsed_result.talking_point}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">建議時機</p>
+                    <p className="text-sm">{advice.parsed_result.suggested_timing}</p>
+                  </div>
+
+                  {advice.parsed_result.evidence.length > 0 ? (
+                    <div className="space-y-1 border-t pt-3">
+                      <p className="text-xs text-muted-foreground">
+                        引用依據（逐字取自客戶說過的話）
+                      </p>
+                      {/* 把出處攤開來給業務看，他才知道這句話術是有根據的，
+                          而不是模型自己編的。這一欄同時也是評估用的指標。 */}
+                      <ul className="space-y-1">
+                        {advice.parsed_result.evidence.map((quote) => (
+                          <li
+                            key={quote}
+                            className="border-l-2 border-muted-foreground/30 pl-2 text-xs text-muted-foreground"
+                          >
+                            {quote}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  <p className="text-xs text-muted-foreground">
+                    產生於 {formatDateTime(advice.created_at)}，當時分數{" "}
+                    {advice.score_snapshot ?? "—"} 分。建議不會改動客戶資料，
+                    下次提醒時間仍然由你決定。
+                  </p>
+                </div>
+              ) : suggestFollowUp.isPending ? null : (
+                <p className="text-xs text-muted-foreground">
+                  {canSuggest
+                    ? "依這位客戶的需求、分數與互動歷史，產生下一步該怎麼跟。"
+                    : "還沒有客戶原話，也還沒有互動紀錄——先記下一筆，AI 才有東西可以依據。"}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle className="text-base">客戶需求（原話）</CardTitle>
@@ -476,6 +654,38 @@ export default function LeadDetailPage() {
                   ))}
                 </div>
 
+                {/* 帶看時間跟「下次提醒」放在一起，因為它們回答的是同一件事：
+                    這通電話講完，接下來什麼時候還要動作。
+                    不另開一個頁面設定 —— 多一個地方要點，就多一個忘記填的理由，
+                    而這一欄沒填的代價是白跑一趟。 */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground">已約帶看</span>
+                  <input
+                    type="datetime-local"
+                    value={viewingAt}
+                    onChange={(e) => setViewingAt(e.target.value)}
+                    className="rounded-md border border-input bg-transparent px-2 py-1 text-xs"
+                  />
+                  {viewingAt ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setViewingAt("")}
+                        className="text-xs text-muted-foreground hover:underline"
+                      >
+                        清除
+                      </button>
+                      <span className="text-xs text-muted-foreground">
+                        前一天會提醒你跟客戶確認
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      這次談定帶看時間才填
+                    </span>
+                  )}
+                </div>
+
                 <Button
                   type="submit"
                   size="sm"
@@ -580,6 +790,56 @@ export default function LeadDetailPage() {
               <CardTitle className="text-base">跟進提醒</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* 帶看排在最上面。業務打開這張卡片時，
+                  「我明天有沒有跟這個人約」比「什麼時候該打給他」急得多。 */}
+              {/* 帶看時間過了之後，這一塊要改口。
+                  一場已經發生的帶看還掛著「已約帶看　前一天會提醒你確認」，
+                  是在講一件不會發生的事 —— 業務看兩次就不會再信這張卡片。
+
+                  不自動清掉那個時間，是因為它仍然是有用的資訊：
+                  「上次帶看是 8/24」正是業務決定下一步時要看的東西。
+                  只是它已經從「待辦」變成了「歷史」，講法要跟著改。 */}
+              {lead.viewing_scheduled_at ? (
+                hasPassed(lead.viewing_scheduled_at) ? (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">上次帶看</p>
+                    <div className="flex items-center gap-3">
+                      <p className="text-sm">
+                        {formatDateTime(lead.viewing_scheduled_at)}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleCancelViewing}
+                        disabled={updateLead.isPending}
+                        className="text-xs text-muted-foreground hover:underline"
+                      >
+                        清除
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1 rounded-md border border-sky-300 bg-sky-50 p-3 dark:border-sky-900 dark:bg-sky-950/40">
+                    <p className="text-xs text-sky-900 dark:text-sky-200">📅 已約帶看</p>
+                    <p className="text-sm font-medium">
+                      {formatDateTime(lead.viewing_scheduled_at)}
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <p className="text-xs text-muted-foreground">
+                        前一天會出現在待跟進清單，提醒你先確認
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleCancelViewing}
+                        disabled={updateLead.isPending}
+                        className="text-xs text-muted-foreground hover:underline"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                )
+              ) : null}
+
               {lead.follow_up_muted ? (
                 <div className="rounded-md bg-muted p-3 text-sm">
                   <p className="font-medium">🔕 已關閉提醒</p>

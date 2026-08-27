@@ -1,0 +1,550 @@
+{
+  "model": "gpt-5.4-mini",
+  "prompt_version": "follow_up_v3",
+  "dataset_version": "v1",
+  "cases": [
+    {
+      "case_id": "fu-001",
+      "tags": [
+        "no_history",
+        "hot"
+      ],
+      "suggestion": {
+        "next_action": "今天先致電約看七期物件",
+        "talking_point": "陳先生，您上次有提到想在七期找三房電梯大樓、又要有車位，而且下個月要過去上班所以有點急，我先直接幫您排幾間合適的，想跟您約今天或明天通個電話，我把目前可看的狀況跟您快速對一下。",
+        "suggested_timing": "今天下班前",
+        "evidence": [
+          "想在七期找三房電梯大樓，預算 2000 萬左右，要有車位，我下個月要過去上班所以有點急"
+        ]
+      },
+      "source_text": "想在七期找三房電梯大樓，預算 2000 萬左右，要有車位，我下個月要過去上班所以有點急",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "N/A",
+          "detail": "這筆沒有互動紀錄"
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": true,
+        "comment": "無"
+      }
+    },
+    {
+      "case_id": "fu-002",
+      "tags": [
+        "rich_history",
+        "after_viewing"
+      ],
+      "suggestion": {
+        "next_action": "回覆她同社區其他戶別狀況",
+        "talking_point": "我看你上次說江子翠那間採光很滿意、但廚房覺得太小，我先幫你確認同社區還有沒有別的戶別，找看看有沒有格局更合你要的板橋兩房。",
+        "suggested_timing": "今天下班前",
+        "evidence": [
+          "帶看江子翠那間，客戶說採光很滿意，但嫌廚房太小，問說同社區還有沒有別的戶別",
+          "約週末看屋，客戶說她只有週六下午有空",
+          "板橋兩房，預算 1500 萬以內，自住，屋齡不要太舊"
+        ]
+      },
+      "source_text": "板橋兩房，預算 1500 萬以內，自住，屋齡不要太舊\n帶看江子翠那間，客戶說採光很滿意，但嫌廚房太小，問說同社區還有沒有別的戶別\n約週末看屋，客戶說她只有週六下午有空\n傳了三間板橋的物件資料給她",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": true,
+        "comment": "無"
+      }
+    },
+    {
+      "case_id": "fu-003",
+      "tags": [
+        "sparse",
+        "cold_score"
+      ],
+      "suggestion": {
+        "next_action": "致電確認看屋需求",
+        "talking_point": "王小姐您好，我看您有在網站上留資料、想看看房子，我想先跟您確認一下目前想看的區域、預算跟是自住還是投資，這樣我比較好幫您配合適的物件，方便跟您聊一下嗎？",
+        "suggested_timing": "今天下午",
+        "evidence": [
+          "網站上留了資料，說想看看房子"
+        ]
+      },
+      "source_text": "網站上留了資料，說想看看房子",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "N/A",
+          "detail": "這筆沒有互動紀錄"
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": true,
+        "comment": "無"
+      }
+    },
+    {
+      "case_id": "fu-004",
+      "tags": [
+        "overdue",
+        "rich_history"
+      ],
+      "suggestion": {
+        "next_action": "致電確認屋主對2100萬的回覆",
+        "talking_point": "我記得你上次說 2100 萬你就簽，屋主那邊還在考慮，我這邊想先幫你確認一下現在回覆到哪了，看要不要順勢把這單往前推。",
+        "suggested_timing": "今天下班前",
+        "evidence": [
+          "2100 萬他就簽，屋主那邊還在考慮",
+          "格局可以，租金行情要我幫他查一下"
+        ]
+      },
+      "source_text": "新莊副都心三房，預算 2200 萬，投資用，可以接受屋齡 15 年內\n談到出價，客戶說 2100 萬他就簽，屋主那邊還在考慮\n帶看副都心那間，客戶說格局可以，租金行情要我幫他查一下",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": true,
+        "comment": "無"
+      }
+    },
+    {
+      "case_id": "fu-005",
+      "tags": [
+        "cold",
+        "customer_said_not_urgent"
+      ],
+      "suggestion": {
+        "next_action": "傳訊息通知信義區合適物件",
+        "talking_point": "李先生，上次您說「不急，有好的再通知我」，我這邊先幫您留意信義區兩三千萬的案子，有符合的我直接傳給您，您有空再看就好。",
+        "suggested_timing": "今天下班前",
+        "evidence": [
+          "看看信義區的房子，兩三千萬都可以，不急，有好的再通知我",
+          "最近工作忙，先不看，有適合的再傳給他就好"
+        ]
+      },
+      "source_text": "看看信義區的房子，兩三千萬都可以，不急，有好的再通知我\n客戶說最近工作忙，先不看，有適合的再傳給他就好",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": true,
+        "comment": "無"
+      }
+    },
+    {
+      "case_id": "fu-006",
+      "tags": [
+        "customer_scheduled"
+      ],
+      "suggestion": {
+        "next_action": "今天下午致電確認先生討論結果",
+        "talking_point": "黃小姐，上次您說這週要跟先生討論，我今天想跟您確認一下討論得怎麼樣了，因為您也提到九月開學前要搬進去，我這邊好接著幫您安排下一步。",
+        "suggested_timing": "今天下午",
+        "evidence": [
+          "這週要跟先生討論",
+          "下週三下午再打給她",
+          "中和四房透天，預算 3000 萬左右，一家五口自住，小孩九月要開學前搬進去"
+        ]
+      },
+      "source_text": "中和四房透天，預算 3000 萬左右，一家五口自住，小孩九月要開學前搬進去\n客戶說這週要跟先生討論，叫我下週三下午再打給她",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": false,
+        "comment": "提早到今天下午致電不算捏造，但話術把「九月開學前要搬進去」拿來當追問理由，雖然是已知資訊，整體仍有點像硬推進度的業務話術。"
+      }
+    },
+    {
+      "case_id": "fu-007",
+      "tags": [
+        "no_history",
+        "cold_score"
+      ],
+      "suggestion": {
+        "next_action": "先致電了解三重兩房行情",
+        "talking_point": "吳先生，我看您是說想先了解一下三重的行情、兩房就好，我先花 1 分鐘跟您確認一下目前大概的市場狀況，也順便聽聽您在意的是總價還是坪數，之後再幫您抓更接近的方向。",
+        "suggested_timing": "今天下班前",
+        "evidence": [
+          "明年再說，先了解一下三重的行情，兩房就好，大概一千兩百萬"
+        ]
+      },
+      "source_text": "明年再說，先了解一下三重的行情，兩房就好，大概一千兩百萬",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "N/A",
+          "detail": "這筆沒有互動紀錄"
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "FAIL",
+          "detail": "輸入裡沒有這些數字：['1']"
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": true,
+        "comment": "沒有捏造客戶資訊，且下一步是具體致電確認行情。"
+      }
+    },
+    {
+      "case_id": "fu-008",
+      "tags": [
+        "rich_history",
+        "objection"
+      ],
+      "suggestion": {
+        "next_action": "回電確認她對漏水與管理費的顧慮",
+        "talking_point": "劉小姐，我記得你前陣子有提到那個社區有漏水的糾紛，管理費也讓你有點猶豫，我想先跟你確認一下，這兩個點你現在是比較在意哪一個？我再依你在意的方向幫你篩。",
+        "suggested_timing": "今天下午",
+        "evidence": [
+          "客戶說她查到那個社區有漏水的糾紛，有點擔心，也覺得管理費偏高",
+          "客戶很喜歡採光"
+        ]
+      },
+      "source_text": "想找大安區的兩房電梯大樓，預算 2800 萬，自住\n客戶說她查到那個社區有漏水的糾紛，有點擔心，也覺得管理費偏高\n帶看大安區那間，客戶很喜歡採光",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": true,
+        "comment": "無"
+      }
+    },
+    {
+      "case_id": "fu-009",
+      "tags": [
+        "no_reply",
+        "overdue"
+      ],
+      "suggestion": {
+        "next_action": "今天晚點再撥一次確認需求",
+        "talking_point": "蔡先生，我上次有照您說的淡水兩房、八百萬以內、投資收租去跟進，前兩次打給您剛好都沒接到。我想再跟您確認一下，您現在還是以這個方向為主嗎？",
+        "suggested_timing": "今天晚點",
+        "evidence": [
+          "淡水兩房，八百萬以內，投資收租",
+          "致電未接",
+          "致電未接，晚上七點打的"
+        ]
+      },
+      "source_text": "淡水兩房，八百萬以內，投資收租\n致電未接\n致電未接，晚上七點打的",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": true,
+        "comment": "無"
+      }
+    },
+    {
+      "case_id": "fu-010",
+      "tags": [
+        "only_interactions"
+      ],
+      "suggestion": {
+        "next_action": "致電確認竹北重劃區需求",
+        "talking_point": "鄭小姐，妳前幾天有提到想看竹北的重劃區、給小孩念書用，預算大概一千五，還希望屋齡新一點。我想先跟妳確認一下，妳現在看的是自住優先還是未來轉手也會考慮？我再依妳的方向幫妳挑合適的物件。",
+        "suggested_timing": "今天下班前",
+        "evidence": [
+          "想買來給小孩念書用",
+          "預算大概一千五",
+          "希望屋齡新一點"
+        ]
+      },
+      "source_text": "客戶來電問竹北的重劃區，說想買來給小孩念書用，預算大概一千五，希望屋齡新一點",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": true,
+        "comment": "無"
+      }
+    },
+    {
+      "case_id": "fu-011",
+      "tags": [
+        "rich_history",
+        "hot",
+        "budget_gap"
+      ],
+      "suggestion": {
+        "next_action": "致電確認他現在看屋進度",
+        "talking_point": "許先生，你上次有提到信義區三房、預算一千八百萬，而且年底前要買到，我想先確認一下你這幾天看屋的進度，順便看你現在比較偏好什麼條件，我好直接幫你篩對的物件。",
+        "suggested_timing": "今天下班前",
+        "evidence": [
+          "想在信義區找三房，預算一千八百萬，年底前要買到，自住",
+          "客戶問說為什麼我傳的都是兩房，他要的是三房",
+          "跟客戶說明信義區三房這個預算很難找，他說那再看看"
+        ]
+      },
+      "source_text": "想在信義區找三房，預算一千八百萬，年底前要買到，自住\n客戶問說為什麼我傳的都是兩房，他要的是三房\n跟客戶說明信義區三房這個預算很難找，他說那再看看",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": true,
+        "comment": "無"
+      }
+    },
+    {
+      "case_id": "fu-012",
+      "tags": [
+        "rich_history",
+        "after_meeting"
+      ],
+      "suggestion": {
+        "next_action": "致電確認婆婆對樓層偏好",
+        "talking_point": "周太太，我記得上次帶看時婆婆有提到樓層太高她不太喜歡，我想先跟您確認一下，之後如果再找物件，我就直接避開她比較在意的樓層，免得白跑。",
+        "suggested_timing": "今天下班前",
+        "evidence": [
+          "婆婆說樓層太高她不喜歡",
+          "先生倒是覺得價格可以接受",
+          "家裡有長輩要一起住"
+        ]
+      },
+      "source_text": "文山區三房，預算 2500 萬，屋齡 20 年內都可以，自住，家裡有長輩要一起住\n客戶帶她先生和婆婆一起來看，婆婆說樓層太高她不喜歡，先生倒是覺得價格可以接受\n帶看文山區那間十二樓的",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": true,
+        "comment": "無"
+      }
+    }
+  ],
+  "failures": []
+}

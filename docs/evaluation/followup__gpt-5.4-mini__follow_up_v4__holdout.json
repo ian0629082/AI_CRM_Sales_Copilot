@@ -1,0 +1,276 @@
+{
+  "model": "gpt-5.4-mini",
+  "prompt_version": "follow_up_v4",
+  "dataset_version": "v1",
+  "cases": [
+    {
+      "case_id": "hold-001",
+      "tags": [],
+      "suggestion": {
+        "next_action": "整理符合條件物件後致電胡小姐",
+        "talking_point": "胡小姐，妳上次有提到要找大里區透天，家門前要有車庫，地坪 30 坪以上、預算大概 1500 萬左右。我這邊先幫妳把符合的整理出來，等我確認到適合的再直接跟妳聯絡。",
+        "suggested_timing": "今天下班前",
+        "evidence": [
+          "我要找大里區透天，家門前要有車庫，地坪需要30坪以上，屋齡不限，預算1500萬左右。",
+          "已聯繫上，詢問需求後，有適合案件會再與客戶連絡"
+        ]
+      },
+      "source_text": "我要找大里區透天，家門前要有車庫，地坪需要30坪以上，屋齡不限，預算1500萬左右。\n已聯繫上，詢問需求後，有適合案件會再與客戶連絡",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "timing_matches",
+          "verdict": "N/A",
+          "detail": "客戶沒有指定下次聯絡時間"
+        },
+        {
+          "name": "viewing_confirmed",
+          "verdict": "N/A",
+          "detail": "明天沒有帶看"
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": true,
+        "comment": "無"
+      }
+    },
+    {
+      "case_id": "hold-002",
+      "tags": [],
+      "suggestion": {
+        "next_action": "致電確認帶看後的考慮結果",
+        "talking_point": "陳太太，上次看完城市之星 12 樓那間後，您說要回去評估一下，我想跟您確認一下，您現在是比較偏好那間的條件，還是還想再看同社區其他樓層或房型？",
+        "suggested_timing": "今天下班前",
+        "evidence": [
+          "我要找城市之星這個社區",
+          "我家人目前也住這個社區",
+          "我找2~3房，不需要車位",
+          "比較喜歡12樓的三房，回去評估一下",
+          "有介紹城市之星社區的8樓的兩房與12樓的三房給她，約好8/24下午14:00帶看"
+        ]
+      },
+      "source_text": "我要找城市之星這個社區，因為我家人目前也住這個社區，我找2~3房，不需要車位，我大概知道社區的行情，只要不要超過行情太多我都可以接受。\n帶看完後表示比較喜歡12樓的三房，回去評估一下\n有介紹城市之星社區的8樓的兩房與12樓的三房給她，約好8/24下午14:00帶看",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "timing_matches",
+          "verdict": "N/A",
+          "detail": "客戶沒有指定下次聯絡時間"
+        },
+        {
+          "name": "viewing_confirmed",
+          "verdict": "N/A",
+          "detail": "明天沒有帶看"
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": true,
+        "comment": "無"
+      }
+    },
+    {
+      "case_id": "hold-003",
+      "tags": [],
+      "suggestion": {
+        "next_action": "今天致電確認明天帶看時間",
+        "talking_point": "吳先生，我這邊跟您確認一下，明天下午 3 點的帶看還是照原本時間嗎？如果時間沒問題，我就先幫您安排好，避免明天臨時有變動。",
+        "suggested_timing": "今天下班前",
+        "evidence": [
+          "我要找西區的大樓，希望找3房的房型，預算1000萬左右，所以屋齡舊一點沒有關係，沒有車位的也可以看。",
+          "約好8/28下午15:00帶看"
+        ]
+      },
+      "source_text": "我要找西區的大樓，希望找3房的房型，預算1000萬左右，所以屋齡舊一點沒有關係，沒有車位的也可以看。\n傳了三間西區的大樓給他，他表示有興趣，約好8/28下午15:00帶看",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "timing_matches",
+          "verdict": "N/A",
+          "detail": "客戶沒有指定下次聯絡時間"
+        },
+        {
+          "name": "viewing_confirmed",
+          "verdict": "PASS",
+          "detail": ""
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": true,
+        "comment": "無"
+      }
+    },
+    {
+      "case_id": "hold-004",
+      "tags": [],
+      "suggestion": {
+        "next_action": "明天先致電確認8/29碰面是否照常",
+        "talking_point": "我記得你上次有提到 8/29 要到公司跟屋主碰面喬價格，我先跟你確認一下這個時間有沒有變；如果你方便，我也順便把目前斡旋的進度整理給你。",
+        "suggested_timing": "8/28",
+        "evidence": [
+          "8/29號要到公司與屋主碰面喬價格",
+          "最後收3750萬的斡旋",
+          "有評估福星路的獨棟電梯別墅",
+          "口頭有出3700萬，再回去跟家人討論"
+        ]
+      },
+      "source_text": "我要找西屯區靠近逢甲大學的電梯別墅，預算有4000萬，希望屋齡新一點的，我有兩部車，有獨棟的最好。\n最後收3750萬的斡旋，約好8/29號要到公司與屋主碰面喬價格\n追蹤客戶表示有明確想賣，約隔天碰面收斡旋\n有評估福星路的獨棟電梯別墅，口頭有出3700萬，再回去跟家人討論",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "timing_matches",
+          "verdict": "N/A",
+          "detail": "客戶沒有指定下次聯絡時間"
+        },
+        {
+          "name": "viewing_confirmed",
+          "verdict": "N/A",
+          "detail": "明天沒有帶看"
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": true,
+        "comment": "內容口吻自然，下一步是明天致電確認是否照常，具體可執行；提到的 8/29 到公司與屋主碰面喬價格都可在客戶說過的話裡找到。"
+      }
+    },
+    {
+      "case_id": "hold-005",
+      "tags": [],
+      "suggestion": {
+        "next_action": "8/29下午送資料給張老闆",
+        "talking_point": "張老闆，之前你說想盡快找中山醫附近的收租套房，而且希望至少10間、投報率5%以上，我這邊先把符合你方向的資料整理好，8/29下午我拿過去給你參考，順便看你哪個條件最在意。",
+        "suggested_timing": "8/29下午",
+        "evidence": [
+          "我手上有一筆資金，想盡快找到產品置產",
+          "要找中山醫附近的收租套房",
+          "至少要有10間",
+          "投報率希望有5%以上",
+          "預算1500萬左右"
+        ]
+      },
+      "source_text": "我手上有一筆資金，想盡快找到產品置產，要找中山醫附近的收租套房，至少要有10間，投報率希望有5%以上，預算1500萬左右。\n介紹了2間獨棟的電梯套房，張老闆希望我8/29下午拿資料過去給他參考",
+      "criteria": [
+        {
+          "name": "grounding",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "uses_history",
+          "verdict": "FAIL",
+          "detail": "有互動紀錄，但沒有任何一條引用來自它"
+        },
+        {
+          "name": "actionable",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "numbers_grounded",
+          "verdict": "PASS",
+          "detail": ""
+        },
+        {
+          "name": "timing_matches",
+          "verdict": "N/A",
+          "detail": "客戶沒有指定下次聯絡時間"
+        },
+        {
+          "name": "viewing_confirmed",
+          "verdict": "N/A",
+          "detail": "明天沒有帶看"
+        }
+      ],
+      "judge": {
+        "tone_natural": true,
+        "action_specific": true,
+        "no_fabrication": true,
+        "comment": "無"
+      }
+    }
+  ],
+  "failures": []
+}
