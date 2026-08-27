@@ -985,14 +985,15 @@
             "type": "array",
             "maxItems": 5,
             "title": "Evidence",
-            "description": "話術引用到的客戶資訊，逐字取自客戶原話或互動紀錄"
+            "description": "話術引用到的客戶資訊，逐字取自客戶原話或互動紀錄；沒有引用就是空陣列"
           }
         },
         "type": "object",
         "required": [
           "next_action",
           "talking_point",
-          "suggested_timing"
+          "suggested_timing",
+          "evidence"
         ],
         "title": "FollowUpSuggestion",
         "description": "AI 產生的跟進建議。\n\n這是專案第一個「AI 生成自由文字」的功能，跟 ParsedRequirement 有根本差異：\n需求解析有標準答案（客戶說了 2000 萬，答案就是 20000000），\n跟進建議沒有 —— 同一位客戶有十種合理的跟法。\n\n所以這裡不追求「答對」，而是把輸出切成三段，讓每一段都能被單獨檢查：\n\n    next_action      下一步動作     業務看得懂、做得到嗎\n    talking_point    建議話術       這是最花時間、最值得自動化的一段\n    suggested_timing 建議時機       跟客戶說過的話對得上嗎\n\n切成三段而不是一整段自由文字，是為了讓評估有著力點 ——\n一整段話只能整體給個「好/不好」，切開之後每一段各有各的判準。\n\n### evidence 這一欄是整個設計的重點\n\n要求模型把「話術裡引用到的客戶資訊」逐字摘出來。\n這一欄不是給業務看的，是給**評估**用的：\n引用的句子必須逐字出現在輸入裡，這是「有沒有捏造」的可程式驗證版本。\n\n沒有它的話，「AI 有沒有編造客戶沒說過的事」只能靠人一句一句讀，\n或再叫另一個 LLM 判斷 —— 前者不可規模化，後者本身也會出錯。"

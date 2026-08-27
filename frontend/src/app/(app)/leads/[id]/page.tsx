@@ -25,6 +25,7 @@ import {
   useAnalyzeLead,
   useDeleteLead,
   useLead,
+  useSuggestFollowUp,
   useUpdateLead,
 } from "@/lib/hooks/use-leads";
 import {
@@ -146,6 +147,7 @@ export default function LeadDetailPage() {
   const deleteLead = useDeleteLead();
   const createInteraction = useCreateInteraction(leadId);
   const analyzeLead = useAnalyzeLead(leadId);
+  const suggestFollowUp = useSuggestFollowUp(leadId);
 
   const [interactionType, setInteractionType] = useState<InteractionType>("CALL");
   const [interactionContent, setInteractionContent] = useState("");
@@ -193,6 +195,25 @@ export default function LeadDetailPage() {
     }
   }
 
+  async function handleSuggestFollowUp() {
+    try {
+      await suggestFollowUp.mutateAsync();
+    } catch {
+      // 跟 AI 解析一樣，錯誤就地顯示在卡片裡並附重試按鈕
+    }
+  }
+
+  async function handleCopyTalkingPoint(text: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success("話術已複製");
+    } catch {
+      // 瀏覽器可能因為權限或非 HTTPS 而擋下剪貼簿。
+      // 話術本來就顯示在畫面上，選取複製一樣做得到，不必當成錯誤處理。
+      toast.error("無法自動複製，請手動選取文字");
+    }
+  }
+
   async function handleDelete() {
     if (!window.confirm(`確定要刪除客戶「${lead?.name}」嗎？此操作無法復原。`)) {
       return;
@@ -236,6 +257,13 @@ export default function LeadDetailPage() {
       </div>
     );
   }
+
+  // 剛產生的那一則優先；沒有的話顯示上次存下來的，
+  // 這樣重新整理頁面後建議還在，不必再花一次錢重產。
+  const advice = suggestFollowUp.data?.suggestion ?? lead.latest_follow_up;
+  // 既沒有原話也沒有互動紀錄時，模型只能靠猜，後端會直接回 422。
+  // 與其讓使用者按了才看到錯誤，不如一開始就把按鈕關掉。
+  const canSuggest = Boolean(lead.raw_requirement) || lead.interactions.length > 0;
 
   return (
     <div className="space-y-4">
@@ -363,6 +391,115 @@ export default function LeadDetailPage() {
                 }
                 aiFilled={isAiFilled(lead, "urgency")}
               />
+            </CardContent>
+          </Card>
+
+          {/* 跟進建議排在需求原話之前。
+              業務打開這一頁想知道的第一件事是「所以我現在該做什麼」，
+              客戶原話是拿來查證的，不是拿來讀的。 */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-base">AI 跟進建議</CardTitle>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSuggestFollowUp}
+                disabled={suggestFollowUp.isPending || !canSuggest}
+              >
+                {suggestFollowUp.isPending
+                  ? "產生中..."
+                  : advice
+                    ? "重新產生"
+                    : "產生建議"}
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {suggestFollowUp.isPending ? (
+                <p className="text-xs text-muted-foreground">
+                  正在讀客戶資料與互動紀錄，大約需要 3～6 秒⋯⋯
+                </p>
+              ) : null}
+
+              {suggestFollowUp.isError ? (
+                <div className="flex flex-wrap items-center gap-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/40">
+                  <span className="text-amber-900 dark:text-amber-200">
+                    {suggestFollowUp.error instanceof ApiError
+                      ? suggestFollowUp.error.message
+                      : "AI 建議目前無法產生"}
+                  </span>
+                  <Button size="sm" variant="outline" onClick={handleSuggestFollowUp}>
+                    重試
+                  </Button>
+                </div>
+              ) : null}
+
+              {advice?.parsed_result ? (
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">下一步動作</p>
+                    <p className="text-sm font-medium">
+                      {advice.parsed_result.next_action}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs text-muted-foreground">建議話術</p>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          handleCopyTalkingPoint(advice.parsed_result!.talking_point)
+                        }
+                        className="text-xs text-muted-foreground hover:underline"
+                      >
+                        複製
+                      </button>
+                    </div>
+                    {/* 話術是這個功能真正省下時間的那一段，所以給它自己的底色，
+                        而且要能一鍵複製 —— 業務下一個動作就是貼到 LINE 上。 */}
+                    <p className="rounded-md bg-muted p-3 text-sm whitespace-pre-wrap">
+                      {advice.parsed_result.talking_point}
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">建議時機</p>
+                    <p className="text-sm">{advice.parsed_result.suggested_timing}</p>
+                  </div>
+
+                  {advice.parsed_result.evidence.length > 0 ? (
+                    <div className="space-y-1 border-t pt-3">
+                      <p className="text-xs text-muted-foreground">
+                        引用依據（逐字取自客戶說過的話）
+                      </p>
+                      {/* 把出處攤開來給業務看，他才知道這句話術是有根據的，
+                          而不是模型自己編的。這一欄同時也是評估用的指標。 */}
+                      <ul className="space-y-1">
+                        {advice.parsed_result.evidence.map((quote) => (
+                          <li
+                            key={quote}
+                            className="border-l-2 border-muted-foreground/30 pl-2 text-xs text-muted-foreground"
+                          >
+                            {quote}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  <p className="text-xs text-muted-foreground">
+                    產生於 {formatDateTime(advice.created_at)}，當時分數{" "}
+                    {advice.score_snapshot ?? "—"} 分。建議不會改動客戶資料，
+                    下次提醒時間仍然由你決定。
+                  </p>
+                </div>
+              ) : suggestFollowUp.isPending ? null : (
+                <p className="text-xs text-muted-foreground">
+                  {canSuggest
+                    ? "依這位客戶的需求、分數與互動歷史，產生下一步該怎麼跟。"
+                    : "還沒有客戶原話，也還沒有互動紀錄——先記下一筆，AI 才有東西可以依據。"}
+                </p>
+              )}
             </CardContent>
           </Card>
 

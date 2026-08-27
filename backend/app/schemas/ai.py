@@ -112,10 +112,14 @@ class FollowUpSuggestion(BaseModel):
     suggested_timing: str = Field(
         min_length=1, max_length=40, description="建議什麼時候聯絡"
     )
+    # 沒有預設值，也就是必填。
+    # 給了 default 的話，OpenAPI 上這一欄會變成選填，前端生成的型別
+    # 就是 string[] | undefined，每次使用都得先判斷一次 —— 但實際上
+    # strict schema 保證模型一定會回這個欄位，沒引用任何東西時是空陣列。
+    # 「沒有引用」與「沒有這個欄位」是兩件事，型別上也該分得開。
     evidence: list[str] = Field(
-        default_factory=list,
         max_length=5,
-        description="話術引用到的客戶資訊，逐字取自客戶原話或互動紀錄",
+        description="話術引用到的客戶資訊，逐字取自客戶原話或互動紀錄；沒有引用就是空陣列",
     )
 
 

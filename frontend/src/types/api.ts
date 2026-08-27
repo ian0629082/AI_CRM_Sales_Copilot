@@ -380,9 +380,9 @@ export interface components {
             suggested_timing: string;
             /**
              * Evidence
-             * @description 話術引用到的客戶資訊，逐字取自客戶原話或互動紀錄
+             * @description 話術引用到的客戶資訊，逐字取自客戶原話或互動紀錄；沒有引用就是空陣列
              */
-            evidence?: string[];
+            evidence: string[];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
