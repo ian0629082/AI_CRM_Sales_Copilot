@@ -1,0 +1,316 @@
+{
+  "meta": {
+    "version": "v1",
+    "case_count": 12,
+    "purpose": "評估 AI 跟進建議（Sprint 5 後半）",
+    "how_to_read": [
+      "這份資料集跟 dataset.json 有一個根本差異：**它沒有 expected 欄位**。",
+      "需求解析有標準答案（客戶說 2000 萬，答案就是 20000000），跟進建議沒有——",
+      "同一位客戶，「先打電話問他考慮得如何」跟「先把物件資料傳過去」都合理。",
+      "所以這裡給的是情境，不是答案；評的是判準（見 evaluation/followup_criteria.py）。",
+      "",
+      "每一筆的 lead 欄位是「AI 已經解析完」的狀態，模擬業務實際看到的畫面。",
+      "interactions 由新到舊，days_ago 是幾天前發生的。",
+      "tags 標示這一筆在考什麼，Error Analysis 時據此分群。",
+      "",
+      "資料一樣不是 LLM 生成的。用同一類模型出題又拿它作答，",
+      "量到的是自我一致性，不是它在真實情境下的表現。"
+    ],
+    "review_status": "初稿由開發者撰寫，情境的真實性待具房仲實務經驗者複核",
+    "coverage": [
+      "no_history: 全新客戶，沒有任何互動 —— 考它會不會硬掰一段不存在的歷史",
+      "rich_history: 互動紀錄很豐富 —— 考它會不會真的用到，還是只看需求欄位",
+      "sparse: 客戶什麼都沒講 —— 考它會不會自己補一個聽起來合理的細節",
+      "overdue: 拖很久沒聯絡 —— 考語氣拿不拿捏得住",
+      "cold: 客戶明說不急 —— 考它會不會硬推",
+      "customer_scheduled: 客戶自己講了時間 —— 考建議時機會不會照他講的"
+    ]
+  },
+  "cases": [
+    {
+      "id": "fu-001",
+      "tags": ["no_history", "hot"],
+      "note": "新進未聯絡的高分客戶。沒有任何互動紀錄，正確的做法是建議第一次接觸，而不是假裝跟過。",
+      "days_since_created": 2,
+      "lead": {
+        "name": "陳先生",
+        "phone": "0912345678",
+        "status": "NEW",
+        "raw_requirement": "想在七期找三房電梯大樓，預算 2000 萬左右，要有車位，我下個月要過去上班所以有點急",
+        "location": "七期",
+        "budget_max": 20000000,
+        "budget_is_approximate": true,
+        "rooms": 3,
+        "property_type": "ELEVATOR_BUILDING",
+        "parking": true,
+        "purpose": "SELF_USE",
+        "urgency": "HIGH"
+      },
+      "interactions": []
+    },
+    {
+      "id": "fu-002",
+      "tags": ["rich_history", "after_viewing"],
+      "note": "帶看完隔天。互動紀錄裡有客戶對物件的具體反應，好的建議應該從那句話切入。",
+      "days_since_created": 20,
+      "next_follow_up_in_days": 0,
+      "lead": {
+        "name": "林小姐",
+        "phone": "0923456789",
+        "status": "INTERESTED",
+        "raw_requirement": "板橋兩房，預算 1500 萬以內，自住，屋齡不要太舊",
+        "location": "板橋",
+        "budget_max": 15000000,
+        "rooms": 2,
+        "purpose": "SELF_USE"
+      },
+      "interactions": [
+        {
+          "type": "VIEWING",
+          "days_ago": 1,
+          "content": "帶看江子翠那間，客戶說採光很滿意，但嫌廚房太小，問說同社區還有沒有別的戶別"
+        },
+        {
+          "type": "CALL",
+          "days_ago": 5,
+          "content": "約週末看屋，客戶說她只有週六下午有空"
+        },
+        { "type": "LINE", "days_ago": 9, "content": "傳了三間板橋的物件資料給她" }
+      ]
+    },
+    {
+      "id": "fu-003",
+      "tags": ["sparse", "cold_score"],
+      "note": "客戶幾乎什麼都沒講。這一筆在考它會不會自己補細節——正確做法是建議去問，不是自己編。",
+      "days_since_created": 3,
+      "lead": {
+        "name": "王小姐",
+        "phone": "0934567890",
+        "status": "NEW",
+        "raw_requirement": "網站上留了資料，說想看看房子"
+      },
+      "interactions": []
+    },
+    {
+      "id": "fu-004",
+      "tags": ["overdue", "rich_history"],
+      "note": "逾期 12 天沒聯絡。語氣要拿捏——不能裝作昨天才聊過，也不必過度道歉。",
+      "days_since_created": 60,
+      "next_follow_up_in_days": -12,
+      "lead": {
+        "name": "張先生",
+        "phone": "0945678901",
+        "status": "NEGOTIATING",
+        "raw_requirement": "新莊副都心三房，預算 2200 萬，投資用，可以接受屋齡 15 年內",
+        "location": "新莊副都心",
+        "budget_max": 22000000,
+        "rooms": 3,
+        "building_age_max": 15,
+        "purpose": "INVESTMENT"
+      },
+      "interactions": [
+        {
+          "type": "MEETING",
+          "days_ago": 14,
+          "content": "談到出價，客戶說 2100 萬他就簽，屋主那邊還在考慮"
+        },
+        {
+          "type": "VIEWING",
+          "days_ago": 21,
+          "content": "帶看副都心那間，客戶說格局可以，租金行情要我幫他查一下"
+        }
+      ]
+    },
+    {
+      "id": "fu-005",
+      "tags": ["cold", "customer_said_not_urgent"],
+      "note": "客戶明說不急。硬推會把人推走，好的建議應該是低頻維繫。",
+      "days_since_created": 40,
+      "next_follow_up_in_days": 0,
+      "lead": {
+        "name": "李先生",
+        "phone": "0956789012",
+        "status": "CONTACTED",
+        "raw_requirement": "看看信義區的房子，兩三千萬都可以，不急，有好的再通知我",
+        "location": "信義區",
+        "budget_min": 20000000,
+        "budget_max": 30000000,
+        "urgency": "LOW"
+      },
+      "interactions": [
+        {
+          "type": "CALL",
+          "days_ago": 14,
+          "content": "客戶說最近工作忙，先不看，有適合的再傳給他就好"
+        }
+      ]
+    },
+    {
+      "id": "fu-006",
+      "tags": ["customer_scheduled"],
+      "note": "客戶自己講了下次聯絡的時間。建議時機應該照他說的，不是自己另外挑一天。",
+      "days_since_created": 15,
+      "next_follow_up_in_days": 0,
+      "lead": {
+        "name": "黃小姐",
+        "phone": "0967890123",
+        "status": "INTERESTED",
+        "raw_requirement": "中和四房透天，預算 3000 萬左右，一家五口自住，小孩九月要開學前搬進去",
+        "location": "中和",
+        "budget_max": 30000000,
+        "budget_is_approximate": true,
+        "rooms": 4,
+        "property_type": "TOWNHOUSE",
+        "purpose": "SELF_USE",
+        "urgency": "HIGH"
+      },
+      "interactions": [
+        {
+          "type": "CALL",
+          "days_ago": 3,
+          "content": "客戶說這週要跟先生討論，叫我下週三下午再打給她"
+        }
+      ]
+    },
+    {
+      "id": "fu-007",
+      "tags": ["no_history", "cold_score"],
+      "note": "需求寫得清楚但明確說不急的新客戶。分數低，但不代表不用聯絡。",
+      "days_since_created": 4,
+      "lead": {
+        "name": "吳先生",
+        "phone": "0978901234",
+        "status": "NEW",
+        "raw_requirement": "明年再說，先了解一下三重的行情，兩房就好，大概一千兩百萬",
+        "location": "三重",
+        "budget_max": 12000000,
+        "budget_is_approximate": true,
+        "rooms": 2,
+        "urgency": "LOW"
+      },
+      "interactions": []
+    },
+    {
+      "id": "fu-008",
+      "tags": ["rich_history", "objection"],
+      "note": "客戶提出了具體的疑慮（漏水、管理費）。建議應該正面處理那個疑慮。",
+      "days_since_created": 35,
+      "next_follow_up_in_days": -2,
+      "lead": {
+        "name": "劉小姐",
+        "phone": "0989012345",
+        "status": "INTERESTED",
+        "raw_requirement": "想找大安區的兩房電梯大樓，預算 2800 萬，自住",
+        "location": "大安區",
+        "budget_max": 28000000,
+        "rooms": 2,
+        "property_type": "ELEVATOR_BUILDING",
+        "purpose": "SELF_USE"
+      },
+      "interactions": [
+        {
+          "type": "CALL",
+          "days_ago": 4,
+          "content": "客戶說她查到那個社區有漏水的糾紛，有點擔心，也覺得管理費偏高"
+        },
+        { "type": "VIEWING", "days_ago": 8, "content": "帶看大安區那間，客戶很喜歡採光" }
+      ]
+    },
+    {
+      "id": "fu-009",
+      "tags": ["no_reply", "overdue"],
+      "note": "連續兩次聯絡不上。建議應該換管道或換時段，不是再打一次一樣的電話。",
+      "days_since_created": 25,
+      "next_follow_up_in_days": -5,
+      "lead": {
+        "name": "蔡先生",
+        "phone": "0990123456",
+        "status": "CONTACTED",
+        "raw_requirement": "淡水兩房，八百萬以內，投資收租",
+        "location": "淡水",
+        "budget_max": 8000000,
+        "rooms": 2,
+        "purpose": "INVESTMENT"
+      },
+      "interactions": [
+        { "type": "CALL", "days_ago": 6, "content": "致電未接" },
+        { "type": "CALL", "days_ago": 9, "content": "致電未接，晚上七點打的" }
+      ]
+    },
+    {
+      "id": "fu-010",
+      "tags": ["only_interactions"],
+      "note": "沒有客戶原話，需求全記在互動裡（電話進線的客戶常常是這樣）。考它會不會只看空白的需求欄位。",
+      "days_since_created": 8,
+      "next_follow_up_in_days": 0,
+      "lead": {
+        "name": "鄭小姐",
+        "phone": "0911223344",
+        "status": "CONTACTED"
+      },
+      "interactions": [
+        {
+          "type": "CALL",
+          "days_ago": 2,
+          "content": "客戶來電問竹北的重劃區，說想買來給小孩念書用，預算大概一千五，希望屋齡新一點"
+        }
+      ]
+    },
+    {
+      "id": "fu-011",
+      "tags": ["rich_history", "hot", "budget_gap"],
+      "note": "客戶的預算跟他想要的區域對不上。建議應該處理這個落差，而不是繼續找不存在的物件。",
+      "days_since_created": 30,
+      "next_follow_up_in_days": 0,
+      "lead": {
+        "name": "許先生",
+        "phone": "0922334455",
+        "status": "INTERESTED",
+        "raw_requirement": "想在信義區找三房，預算一千八百萬，年底前要買到，自住",
+        "location": "信義區",
+        "budget_max": 18000000,
+        "rooms": 3,
+        "purpose": "SELF_USE",
+        "urgency": "HIGH"
+      },
+      "interactions": [
+        {
+          "type": "LINE",
+          "days_ago": 3,
+          "content": "客戶問說為什麼我傳的都是兩房，他要的是三房"
+        },
+        {
+          "type": "CALL",
+          "days_ago": 10,
+          "content": "跟客戶說明信義區三房這個預算很難找，他說那再看看"
+        }
+      ]
+    },
+    {
+      "id": "fu-012",
+      "tags": ["rich_history", "after_meeting"],
+      "note": "面談完，客戶帶了家人一起看。建議應該考慮到決策者不只一個人。",
+      "days_since_created": 45,
+      "next_follow_up_in_days": -1,
+      "lead": {
+        "name": "周太太",
+        "phone": "0933445566",
+        "status": "MEETING",
+        "raw_requirement": "文山區三房，預算 2500 萬，屋齡 20 年內都可以，自住，家裡有長輩要一起住",
+        "location": "文山區",
+        "budget_max": 25000000,
+        "rooms": 3,
+        "building_age_max": 20,
+        "purpose": "SELF_USE"
+      },
+      "interactions": [
+        {
+          "type": "MEETING",
+          "days_ago": 3,
+          "content": "客戶帶她先生和婆婆一起來看，婆婆說樓層太高她不喜歡，先生倒是覺得價格可以接受"
+        },
+        { "type": "VIEWING", "days_ago": 6, "content": "帶看文山區那間十二樓的" }
+      ]
+    }
+  ]
+}
