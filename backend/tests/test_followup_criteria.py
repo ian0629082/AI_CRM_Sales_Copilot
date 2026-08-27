@@ -180,13 +180,40 @@ def test_no_appointment_is_not_applicable():
     )
 
 
-def test_availability_is_not_an_appointment():
-    """「我只有週六下午有空」講的是他能看屋的時間，不是叫你週六才能打電話。
+def test_availability_about_viewing_is_not_an_appointment():
+    """「約週末看屋，她只有週六下午有空」——那是看屋時間，不是回電時間。
 
-    這條界線是業務實務判斷。混在一起的話，這條判準會開始否決掉
-    完全正常的建議——業務要打電話確認一件事，不必等到客戶有空看房。
+    業務要打電話確認一件事，不必等到客戶有空看房。
     """
     source = "約週末看屋，客戶說她只有週六下午有空"
+    result = check_timing_matches_appointment("今天下班前", source)
+    assert result.verdict is Verdict.NOT_APPLICABLE
+    assert "看屋" in result.detail
+
+
+def test_availability_about_contact_is_an_appointment():
+    """同一句「有空」，講的是電話就要照做。
+
+    這是業務實務判斷：「我只有週六下午有空」可能是「你週六下午再打給我」，
+    也可能是「我週六下午才能去看房子」，意思完全相反。
+    所以要看前後文在講聯絡還是看屋，不能一律當成其中一種。
+    """
+    source = "客戶說他平日都在忙，電話的話只有週六下午有空"
+    assert (
+        check_timing_matches_appointment("今天下班前", source).verdict is Verdict.FAIL
+    )
+    assert (
+        check_timing_matches_appointment("週六下午", source).verdict is Verdict.PASS
+    )
+
+
+def test_ambiguous_availability_does_not_fail():
+    """看不出來在講什麼就不判失敗。
+
+    這條判準寧可漏抓，也不要誤殺一則其實正常的建議——
+    一個會誤報的指標，業務看兩次就不看了。
+    """
+    source = "客戶說他只有週六下午有空"
     assert (
         check_timing_matches_appointment("今天下班前", source).verdict
         is Verdict.NOT_APPLICABLE

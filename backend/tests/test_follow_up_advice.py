@@ -364,6 +364,22 @@ def test_cannot_suggest_for_someone_elses_lead(advice_client, other_client):
     assert _suggest(other_client, lead["id"]).status_code == 404
 
 
+def test_every_prompt_version_has_different_content():
+    """每個版號的內容必須真的不一樣。
+
+    新版是用 .replace() 從舊版疊出來的，而 .replace() 錨點對不上時
+    **不報錯，只是原封不動回傳**。這件事真的發生過：v4 的錨點少算一個換行，
+    結果 v4 的內容跟 v3 一模一樣，但版號、日誌、資料庫紀錄全都顯示是 v4。
+
+    最糟的地方在於評估還是跑得完、報告還是產得出來——
+    你以為在比較兩個版本，其實在比較同一個版本兩次。
+    """
+    from app.services.follow_up_advisor import FOLLOW_UP_PROMPTS
+
+    contents = list(FOLLOW_UP_PROMPTS.values())
+    assert len(set(contents)) == len(contents)
+
+
 def test_unknown_prompt_version_is_rejected_at_construction(fake_llm):
     """打錯版號要當場爆掉，而不是安靜地用預設版本跑完整份評估。"""
     with pytest.raises(ValueError):

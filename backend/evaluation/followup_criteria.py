@@ -187,13 +187,63 @@ def check_numbers_grounded(talking_point: str, source_text: str) -> CriterionRes
     return CriterionResult("numbers_grounded", Verdict.PASS)
 
 
-# 客戶「明確約定下次回電時間」的說法。
+# 客戶「明確約定下次回電時間」的說法。這幾個詞本身就指向聯絡，不必看上下文。
+_APPOINTMENT = re.compile(
+    r".{0,12}(?:再打給|再聯絡|再回你|再回我|再撥|再找我|再約|再通知|打給我|聯絡我)"
+)
+
+# 「有空」「方便」要看上下文才知道在講什麼。
 #
-# 刻意只收這幾種：客戶主動指定了下次聯絡的時間點。
-# **不收「有空」「方便」**——「我只有週六下午有空」講的是他什麼時候能看屋，
-# 不是「你週六下午再打給我」。業務要打電話確認一件事，不必等到他有空看房。
-# 兩者混在一起的話，這條判準會開始否決掉完全正常的建議。
-_APPOINTMENT = re.compile(r".{0,12}(?:再打給|再聯絡|再回你|再回我|再撥|再找我|再約|再通知)")
+# 這一條是業務實務判斷：同樣一句「我只有週六下午有空」，
+# 可能是「你週六下午再打給我」，也可能是「我週六下午才能去看房子」。
+# 兩者對業務的意義完全相反——前者要照做，後者不必等。
+#
+# 所以往前後各看一段字，判斷這句話是在講聯絡還是看屋。
+# 判斷不出來時回「不確定」，然後**不判失敗**：
+# 這條判準寧可漏抓，也不要誤殺一則其實正常的建議——
+# 一個會誤報的指標，業務看兩次就不看了。
+_AVAILABILITY = re.compile(r"有空|方便")
+_CONTEXT_WINDOW = 15
+
+_VIEWING_WORDS = ("看屋", "帶看", "看房", "賞屋", "約看", "去看", "現場", "見面", "面談")
+_CONTACT_WORDS = ("電話", "打給", "打來", "聯絡", "回電", "通話", "LINE", "訊息", "傳給")
+
+
+class AppointmentKind(str, Enum):
+    """客戶約的是什麼。"""
+
+    CONTACT = "CONTACT"  # 約好下次聯絡的時間，建議時機必須照做
+    VIEWING = "VIEWING"  # 約好看屋的時間，不必等到那時候才打電話
+    NONE = "NONE"  # 沒有約，或看不出來在講什麼
+
+
+def classify_appointment(source_text: str) -> tuple[AppointmentKind, str]:
+    """客戶有沒有約時間、約的是聯絡還是看屋。
+
+    回傳 (種類, 那段原話)。抽成獨立函式是因為它同時被兩個地方用到：
+    這裡的判準，以及日後要做「帶看前一天提醒業務確認」時的判斷。
+    """
+    # 明確的回電約定優先。「叫我下週三再打給你」不管前後文都是聯絡。
+    explicit = [m.group(0) for m in _APPOINTMENT.finditer(source_text)]
+    if explicit:
+        return AppointmentKind.CONTACT, " ".join(explicit)
+
+    for match in _AVAILABILITY.finditer(source_text):
+        start = max(0, match.start() - _CONTEXT_WINDOW)
+        window = source_text[start : match.end() + _CONTEXT_WINDOW]
+
+        has_viewing = any(w in window for w in _VIEWING_WORDS)
+        has_contact = any(w in window for w in _CONTACT_WORDS)
+
+        # 兩種詞同時出現時當成看屋。
+        # 「我打電話跟你約，我只有週六下午有空」講的還是看屋的時間，
+        # 那個「打電話」只是他描述怎麼約，不是他要求你何時打。
+        if has_viewing:
+            return AppointmentKind.VIEWING, window
+        if has_contact:
+            return AppointmentKind.CONTACT, window
+
+    return AppointmentKind.NONE, ""
 
 # 日期層級的時間詞。這一級才算「約好了哪一天」。
 _DAY = re.compile(
@@ -227,15 +277,20 @@ def check_timing_matches_appointment(
     只比對「下午」的話，「客戶約下週三下午、業務今天下午打」會被判成通過——
     而那正是這條判準唯一要抓的東西。
     """
-    appointments = _APPOINTMENT.findall(source_text) or [
-        m.group(0) for m in _APPOINTMENT.finditer(source_text)
-    ]
-    if not appointments:
+    kind, promised = classify_appointment(source_text)
+
+    if kind is AppointmentKind.NONE:
         return CriterionResult(
             "timing_matches", Verdict.NOT_APPLICABLE, "客戶沒有指定下次聯絡時間"
         )
 
-    promised = " ".join(appointments)
+    if kind is AppointmentKind.VIEWING:
+        # 客戶約的是看屋時間，不是回電時間。
+        # 業務要打電話確認一件事，不必等到他有空看房——
+        # 事實上正好相反：帶看前一天就該先聯絡確認（見 follow_up.py）。
+        return CriterionResult(
+            "timing_matches", Verdict.NOT_APPLICABLE, "客戶講的是看屋時間，不是回電時間"
+        )
     days = _DAY.findall(promised)
     if days:
         if any(day in suggested_timing for day in days):
