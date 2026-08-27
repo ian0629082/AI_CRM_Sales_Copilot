@@ -199,13 +199,53 @@ SYSTEM_PROMPT_V3 = SYSTEM_PROMPT_V2.replace(
 
 FOLLOW_UP_PROMPT_V3 = "follow_up_v3"
 
+# v4 補的是一條**業務實務規則**，不是格式問題。
+#
+# v3 在開發集上四條判準全過，但有一筆錯得很明顯，而四條判準全都看不到：
+#
+#   客戶說：叫我下週三下午再打給她
+#   建議時機：今天下午
+#
+# 它引用得完全正確（那句話逐字摘出來了），grounding 判 PASS，
+# 然後建議業務今天就打。前面那幾條檢查的是「有沒有亂講」，
+# 沒有一條在問「講得對不對」。
+#
+# 這條規則是專案作者（有房仲業務經驗）定的：
+# 客戶掛電話前講的那句「X 再打給我」，是他給的最明確的指示。
+# 業務提早打過去，等於沒把他的話當一回事。
+#
+# 對應的判準是 evaluation/followup_criteria.check_timing_matches_appointment。
+# 規則要同時寫進 prompt 與判準——只寫判準是抓錯不修錯，
+# 只寫 prompt 則沒有人在驗它有沒有照做。
+SYSTEM_PROMPT_V4 = SYSTEM_PROMPT_V3.replace(
+    """【suggested_timing 建議時機】**15 字以內。**
+什麼時候聯絡比較好，例如「今天下班前」「明天上午」「這週六」。
+如果客戶講過他方便的時間，就照他講的。""",
+    """【suggested_timing 建議時機】**15 字以內。**
+什麼時候聯絡比較好，例如「今天下班前」「明天上午」「這週六」。
+
+**客戶自己約過時間的話，一律照他講的，不可以提前。**
+- 「叫我下週三下午再打給你」→ 建議時機就是「下週三下午」，不是「今天下午」
+- 「我下週回你」→ 建議時機是「下週」
+客戶掛電話前講的那句話，是他給的最明確的指示。
+提早打過去等於沒把他的話當一回事，客戶會直接感覺到。
+
+分清楚兩種話：
+- 「叫我下週三再打給我」→ 這是**約定回電時間**，必須照做
+- 「我只有週六下午有空」→ 這是他**能看屋**的時間，不是叫你週六才能打電話。
+  要打電話確認事情，不必等到那時候。""",
+)
+
+FOLLOW_UP_PROMPT_V4 = "follow_up_v4"
+
 FOLLOW_UP_PROMPTS: dict[str, str] = {
     FOLLOW_UP_PROMPT_V1: SYSTEM_PROMPT_V1,
     FOLLOW_UP_PROMPT_V2: SYSTEM_PROMPT_V2,
     FOLLOW_UP_PROMPT_V3: SYSTEM_PROMPT_V3,
+    FOLLOW_UP_PROMPT_V4: SYSTEM_PROMPT_V4,
 }
 
-DEFAULT_FOLLOW_UP_PROMPT_VERSION = FOLLOW_UP_PROMPT_V3
+DEFAULT_FOLLOW_UP_PROMPT_VERSION = FOLLOW_UP_PROMPT_V4
 
 FOLLOW_UP_JSON_SCHEMA = {
     "type": "object",

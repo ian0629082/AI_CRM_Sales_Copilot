@@ -67,8 +67,19 @@ from evaluation.followup_criteria import FollowUpReport, evaluate_case
 from evaluation.followup_report import render_followup_markdown
 
 BACKEND_DIR = pathlib.Path(__file__).resolve().parents[1]
-CASES_PATH = BACKEND_DIR / "evaluation" / "followup_cases.json"
+EVALUATION_DIR = BACKEND_DIR / "evaluation"
 OUTPUT_DIR = BACKEND_DIR.parent / "docs" / "evaluation"
+
+# dev     = 開發集。prompt 已經看著它的失敗調過好幾輪，數字必然偏高。
+# holdout = 驗證集。由具業務經驗、未讀過 prompt 的人出題，只量測，
+#           要對外引用的數字一律引用這一份。
+#
+# 這個分法跟 evaluate_parsing.py 一樣，理由也一樣：
+# 看著錯誤改出來的 prompt，在同一份資料上拿高分等於對著考卷改答案。
+DATASETS = {
+    "dev": EVALUATION_DIR / "followup_cases.json",
+    "holdout": EVALUATION_DIR / "followup_holdout.json",
+}
 
 # 評估時固定用這一天當「今天」。
 #
@@ -284,6 +295,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="加跑 LLM Judge（第二層）。每筆會多一次 API 呼叫。",
     )
+    parser.add_argument(
+        "--dataset",
+        default="dev",
+        choices=sorted(DATASETS),
+        help="dev 開發集（可以拿來調 prompt）、holdout 驗證集（只量測，數字才能對外引用）",
+    )
     parser.add_argument("--limit", type=int, default=None, help="只跑前 N 筆")
     parser.add_argument("--workers", type=int, default=4)
     return parser.parse_args()
@@ -296,11 +313,21 @@ def main() -> int:
         print("錯誤：未設定 OPENAI_API_KEY，無法執行評估", file=sys.stderr)
         return 1
 
-    dataset = json.loads(CASES_PATH.read_text(encoding="utf-8"))
+    dataset = json.loads(DATASETS[args.dataset].read_text(encoding="utf-8"))
     cases = dataset["cases"][: args.limit] if args.limit else dataset["cases"]
 
+    # 範本還沒填就跑，只會得到一份看起來很正常、其實毫無意義的報告。
+    # 擋在這裡，而不是讓人事後才發現姓名全都是空字串。
+    if not cases or all(not c.get("lead", {}).get("name") for c in cases):
+        print(
+            f"「{args.dataset}」還沒有可用的案例（{DATASETS[args.dataset].name}）。",
+            file=sys.stderr,
+        )
+        return 1
+
     print(
-        f"模型 {args.model}　Prompt {args.prompt_version}　情境 {len(cases)} 筆"
+        f"模型 {args.model}　Prompt {args.prompt_version}　"
+        f"資料集 {args.dataset}　情境 {len(cases)} 筆"
         f"{'　（含 LLM Judge）' if args.judge else ''}"
     )
     print(f"平行度 {args.workers}，開始執行⋯⋯（會呼叫真實 OpenAI）")
@@ -332,11 +359,16 @@ def main() -> int:
     )
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    stem = f"followup__{args.model}__{args.prompt_version}".replace("/", "_")
+    # 檔名一定要帶資料集名稱。少了它，開發集跟驗證集的報告會互相覆蓋，
+    # 然後某天有人引用了一個其實來自開發集的數字。
+    stem = f"followup__{args.model}__{args.prompt_version}__{args.dataset}".replace("/", "_")
 
     (OUTPUT_DIR / f"{stem}.md").write_text(
         render_followup_markdown(
-            report, dataset_version=dataset["meta"]["version"], judged=args.judge
+            report,
+            dataset_version=dataset["meta"]["version"],
+            judged=args.judge,
+            dataset_name=args.dataset,
         ),
         encoding="utf-8",
     )

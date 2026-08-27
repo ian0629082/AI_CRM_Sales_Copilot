@@ -1,0 +1,103 @@
+{
+  "meta": {
+    "version": "v1-draft",
+    "status": "空白範本，等待填寫",
+    "case_count": 0,
+    "purpose": "跟進建議的 held-out 驗證集——只用來量測，永遠不拿來調 prompt",
+
+    "誰來填": [
+      "由具房仲業務實務經驗的人填（本專案作者）。",
+      "",
+      "為什麼不能由寫 prompt 的人填：他想得到的情境，prompt 早就處理了；",
+      "他想不到的，兩邊都沒有。那樣的驗證集會很好看，然後毫無意義。"
+    ],
+
+    "填之前的三條規矩": [
+      "1. 不要看 followup_cases.json（那是開發集，prompt 已經照著它調過兩輪）",
+      "2. 不要看 app/services/follow_up_advisor.py 裡的 prompt",
+      "3. 不要看 docs/evaluation/followup__*.md 的失敗案例",
+      "",
+      "看過任何一項，這份就自動降級成第二個開發集——",
+      "它的全部價值來自「從沒影響過任何決定」。"
+    ],
+
+    "要寫幾筆": [
+      "15 筆左右就夠（Sprint 4 的需求解析 holdout 是 21 筆）。",
+      "筆數不是重點，出題的人知道真實客戶怎麼講話才是。",
+      "",
+      "**照你實際帶客戶的比例寫，不要刻意平均分配。**",
+      "如果十個客戶裡有三個會自己約回電時間，那就寫三筆——",
+      "驗證集要像真實世界，不是像一份考卷。"
+    ],
+
+    "怎麼想題目": [
+      "想你手上正在跟的客戶，這禮拜哪幾個讓你猶豫過",
+      "「現在要打給他嗎、打了要講什麼」。那就是題目。",
+      "",
+      "互動紀錄照你平常真的會打的字寫，不要寫得比平常整齊——",
+      "AI 之後要讀的就是那種字。"
+    ],
+
+    "欄位說明": {
+      "id": "hold-001 這樣編號就好",
+      "tags": "自由填，Error Analysis 時用來分群看哪一類情境容易出錯",
+      "note": "只在你覺得「這一筆在考什麼」不明顯時才寫",
+      "days_since_created": "這位客戶建檔幾天了",
+      "next_follow_up_in_days": "距離下次提醒還有幾天。0 是今天到期，-5 是逾期五天，不填代表還沒設過提醒",
+      "lead": {
+        "name": "客戶稱呼，例如「陳先生」",
+        "phone": "有留電話就填，沒留就整行刪掉（會影響分數）",
+        "status": "NEW 新進 / CONTACTED 已聯絡 / INTERESTED 有興趣 / MEETING 面談 / NEGOTIATING 議價 / WON 成交 / LOST 流失",
+        "raw_requirement": "客戶原話。沒有就整行刪掉——電話進線的客戶常常沒有",
+        "location": "區域，保留客戶的講法",
+        "budget_min": "元。1500 萬寫 15000000。只有明確講區間才填下限",
+        "budget_max": "元。客戶講「預算 2000 萬」通常指上限",
+        "budget_is_approximate": "true 代表客戶講的是概數（2000 萬左右）",
+        "rooms": "幾房，整數",
+        "property_type": "ELEVATOR_BUILDING 電梯大樓 / LOW_RISE 華廈 / APARTMENT 公寓 / TOWNHOUSE 透天厝 / VILLA 別墅 / STUDIO 套房",
+        "building_age_max": "可接受的屋齡上限（年）",
+        "parking": "true 要車位 / false 不用",
+        "purpose": "SELF_USE 自住 / INVESTMENT 投資 / BOTH 兩者",
+        "purchase_timeline": "幾個月內要買，只有客戶講出明確月數才填",
+        "urgency": "HIGH 明確表達急 / LOW 明確表達不急 / 沒表態就整行刪掉"
+      },
+      "interactions": {
+        "type": "CALL 電話 / LINE / EMAIL / MEETING 面談 / VIEWING 帶看 / NOTE 備註",
+        "days_ago": "幾天前發生的",
+        "content": "你當時會在 CRM 裡打的那段字"
+      }
+    },
+
+    "用不到的欄位就整行刪掉": [
+      "不要填 null，直接把那一行刪掉。",
+      "「客戶沒提到」跟「填了一個空值」在計分上是同一件事，",
+      "但刪掉比較好讀，你也比較不會不小心填錯。"
+    ]
+  },
+
+  "cases": [
+    {
+      "id": "hold-001",
+      "tags": ["把這裡換成你覺得這筆在考什麼"],
+      "days_since_created": 0,
+      "next_follow_up_in_days": 0,
+      "lead": {
+        "name": "",
+        "phone": "",
+        "status": "NEW",
+        "raw_requirement": "",
+        "location": "",
+        "budget_max": 0,
+        "rooms": 0,
+        "purpose": "SELF_USE"
+      },
+      "interactions": [
+        {
+          "type": "CALL",
+          "days_ago": 0,
+          "content": ""
+        }
+      ]
+    }
+  ]
+}

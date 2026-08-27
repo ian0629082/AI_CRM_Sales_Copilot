@@ -187,6 +187,82 @@ def check_numbers_grounded(talking_point: str, source_text: str) -> CriterionRes
     return CriterionResult("numbers_grounded", Verdict.PASS)
 
 
+# 客戶「明確約定下次回電時間」的說法。
+#
+# 刻意只收這幾種：客戶主動指定了下次聯絡的時間點。
+# **不收「有空」「方便」**——「我只有週六下午有空」講的是他什麼時候能看屋，
+# 不是「你週六下午再打給我」。業務要打電話確認一件事，不必等到他有空看房。
+# 兩者混在一起的話，這條判準會開始否決掉完全正常的建議。
+_APPOINTMENT = re.compile(r".{0,12}(?:再打給|再聯絡|再回你|再回我|再撥|再找我|再約|再通知)")
+
+# 日期層級的時間詞。這一級才算「約好了哪一天」。
+_DAY = re.compile(
+    r"下下週[一二三四五六日天]|下週[一二三四五六日天]|這週[一二三四五六日天]"
+    r"|禮拜[一二三四五六日天]|週[一二三四五六日天]"
+    r"|大後天|後天|明天|下週|下個月|\d{1,2}號"
+)
+
+# 只有時段沒有日期時才看這一級。
+# 「下午」單獨出現不足以構成約定——「今天下午」也含「下午」，
+# 用它來比對的話，客戶約下週三下午、業務今天下午打，會被判成通過。
+_TIME_OF_DAY = re.compile(r"上午|下午|早上|中午|傍晚|晚上|下班前")
+
+
+def check_timing_matches_appointment(
+    suggested_timing: str, source_text: str
+) -> CriterionResult:
+    """客戶自己約了時間，建議時機就要照他講的。
+
+    這條判準是**業務實務判斷**，不是我想出來的：
+    客戶說「叫我下週三下午再打給你」，業務今天下午就打過去，
+    等於沒把他的話當一回事。客戶掛電話前講的那句話，
+    是他給的最明確的指示，比任何規則都準。
+
+    這也是前四條判準結構性看不到的一類錯誤。
+    第一輪 v3 的評估裡，fu-006 引用得完全正確（那句話它逐字摘出來了）、
+    grounding 判 PASS，然後建議業務今天就打。
+    前四條檢查的是「有沒有亂講」，這一條檢查的是「講得對不對」。
+
+    日期跟時段分兩級比對：客戶講到哪一天，就必須對到哪一天。
+    只比對「下午」的話，「客戶約下週三下午、業務今天下午打」會被判成通過——
+    而那正是這條判準唯一要抓的東西。
+    """
+    appointments = _APPOINTMENT.findall(source_text) or [
+        m.group(0) for m in _APPOINTMENT.finditer(source_text)
+    ]
+    if not appointments:
+        return CriterionResult(
+            "timing_matches", Verdict.NOT_APPLICABLE, "客戶沒有指定下次聯絡時間"
+        )
+
+    promised = " ".join(appointments)
+    days = _DAY.findall(promised)
+    if days:
+        if any(day in suggested_timing for day in days):
+            return CriterionResult("timing_matches", Verdict.PASS)
+        return CriterionResult(
+            "timing_matches",
+            Verdict.FAIL,
+            f"客戶約的是「{days[0]}」，建議時機卻是「{suggested_timing}」",
+        )
+
+    slots = _TIME_OF_DAY.findall(promised)
+    if slots:
+        if any(slot in suggested_timing for slot in slots):
+            return CriterionResult("timing_matches", Verdict.PASS)
+        return CriterionResult(
+            "timing_matches",
+            Verdict.FAIL,
+            f"客戶約的是「{slots[0]}」，建議時機卻是「{suggested_timing}」",
+        )
+
+    # 有約定的說法但抓不出時間詞（例如「有物件再通知我」）。
+    # 那不是約時間，是把決定權交給業務，不該要求時機對得上。
+    return CriterionResult(
+        "timing_matches", Verdict.NOT_APPLICABLE, "客戶有提到再聯絡，但沒講明時間"
+    )
+
+
 @dataclass
 class FollowUpCaseResult:
     """一筆案例的評估結果。"""
@@ -238,6 +314,9 @@ def evaluate_case(
             check_uses_history(evidence, interaction_text),
             check_actionable(suggestion.get("next_action", "")),
             check_numbers_grounded(suggestion.get("talking_point", ""), source_text),
+            check_timing_matches_appointment(
+                suggestion.get("suggested_timing", ""), source_text
+            ),
         ],
     )
 
@@ -245,6 +324,7 @@ def evaluate_case(
 # 報告裡判準的排列順序，由重要到次要
 CRITERIA_ORDER: tuple[str, ...] = (
     "grounding",
+    "timing_matches",
     "uses_history",
     "actionable",
     "numbers_grounded",
@@ -252,6 +332,7 @@ CRITERIA_ORDER: tuple[str, ...] = (
 
 CRITERIA_LABELS: dict[str, str] = {
     "grounding": "引用有出處（沒有捏造）",
+    "timing_matches": "時機對得上客戶約的時間",
     "uses_history": "有用到互動歷史",
     "actionable": "下一步是具體動作",
     "numbers_grounded": "話術裡的數字有出處",

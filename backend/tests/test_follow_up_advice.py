@@ -142,7 +142,7 @@ def test_metadata_and_score_snapshot_are_recorded(advice_client):
     assert body["analysis_type"] == "FOLLOW_UP"
     # 寫死版號而不是引用常數：改了預設 prompt 就該讓這個測試紅一次，
     # 逼人確認「這次改版有跑過評估嗎」。
-    assert body["prompt_version"] == "follow_up_v3"
+    assert body["prompt_version"] == "follow_up_v4"
     assert body["model"] == "fake-model"
     assert body["prompt_tokens"] == 300
     assert body["latency_ms"] is not None

@@ -15,6 +15,7 @@ from evaluation.followup_criteria import (
     check_actionable,
     check_grounding,
     check_numbers_grounded,
+    check_timing_matches_appointment,
     check_uses_history,
     evaluate_case,
 )
@@ -146,6 +147,58 @@ def test_chinese_numerals_are_ignored():
     然後真的出事時也沒人看。
     """
     assert check_numbers_grounded("三天後再約他看屋", SOURCE).verdict is Verdict.PASS
+
+
+# ---------------------------------------------------------------- 時機
+
+
+APPOINTMENT = "客戶說這週要跟先生討論，叫我下週三下午再打給她"
+
+
+def test_timing_must_match_the_day_the_customer_named():
+    """客戶約下週三，建議今天下午——這是這條判準唯一要抓的東西。
+
+    注意「今天下午」跟「下週三下午」都含「下午」。
+    如果比對只看時段，這一筆會被判成通過，那這條判準就白寫了。
+    """
+    result = check_timing_matches_appointment("今天下午", APPOINTMENT)
+    assert result.verdict is Verdict.FAIL
+    assert "下週三" in result.detail
+
+
+def test_timing_matching_the_appointment_passes():
+    assert (
+        check_timing_matches_appointment("下週三下午", APPOINTMENT).verdict is Verdict.PASS
+    )
+
+
+def test_no_appointment_is_not_applicable():
+    """客戶沒約時間，業務自己決定何時打，這條判準不適用。"""
+    assert (
+        check_timing_matches_appointment("明天上午", SOURCE).verdict
+        is Verdict.NOT_APPLICABLE
+    )
+
+
+def test_availability_is_not_an_appointment():
+    """「我只有週六下午有空」講的是他能看屋的時間，不是叫你週六才能打電話。
+
+    這條界線是業務實務判斷。混在一起的話，這條判準會開始否決掉
+    完全正常的建議——業務要打電話確認一件事，不必等到客戶有空看房。
+    """
+    source = "約週末看屋，客戶說她只有週六下午有空"
+    assert (
+        check_timing_matches_appointment("今天下班前", source).verdict
+        is Verdict.NOT_APPLICABLE
+    )
+
+
+def test_vague_promise_is_not_applicable():
+    """「有物件再通知我」不是約時間，是把決定權交給業務。"""
+    assert (
+        check_timing_matches_appointment("這週五", "客戶說有物件再通知我").verdict
+        is Verdict.NOT_APPLICABLE
+    )
 
 
 # ---------------------------------------------------------------- 彙總

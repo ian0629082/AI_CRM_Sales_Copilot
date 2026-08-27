@@ -23,8 +23,21 @@ def _pct(value: float | None) -> str:
     return "—" if value is None else f"{value * 100:.1f}%"
 
 
+DATASET_CAVEAT = {
+    "dev": (
+        "⚠️ 這是**開發集**。Prompt 的規則是看著它的失敗案例補出來的，"
+        "分數必然偏高，**不適合對外引用**。要引用請用 holdout 那份報告。"
+    ),
+    "holdout": (
+        "✅ 這是**驗證集**，從未被用來修改 prompt，"
+        "而且是由具房仲實務經驗、未讀過 prompt 的人出題的。"
+        "模型在完全沒看過這些情境的狀況下作答，這裡的數字才可以對外引用。"
+    ),
+}
+
+
 def render_followup_markdown(
-    report: FollowUpReport, *, dataset_version: str, judged: bool
+    report: FollowUpReport, *, dataset_version: str, judged: bool, dataset_name: str = "dev"
 ) -> str:
     lines: list[str] = []
     add = lines.append
@@ -35,9 +48,11 @@ def render_followup_markdown(
     add(f"- Prompt 版本：`{report.prompt_version}`")
     total = len(report.cases) + len(report.failed_cases)
     add(
-        f"- 情境資料集：{dataset_version}，{total} 筆"
+        f"- 情境資料集：{dataset_name} {dataset_version}，{total} 筆"
         + (f"（{len(report.failed_cases)} 筆執行失敗，未計入統計）" if report.failed_cases else "")
     )
+    add("")
+    add(DATASET_CAVEAT.get(dataset_name, ""))
     add("")
 
     add("> 這份評估**沒有標準答案可以比對**。")
