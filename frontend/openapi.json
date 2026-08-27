@@ -1920,6 +1920,7 @@
           "CONTACTED",
           "INTERESTED",
           "MEETING",
+          "VIEWING",
           "NEGOTIATING",
           "WON",
           "LOST"

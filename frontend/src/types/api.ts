@@ -637,7 +637,7 @@ export interface components {
          * @description Lead 在銷售漏斗中的位置（對應 Dashboard 的 Lead Funnel）。
          * @enum {string}
          */
-        LeadStatus: "NEW" | "CONTACTED" | "INTERESTED" | "MEETING" | "NEGOTIATING" | "WON" | "LOST";
+        LeadStatus: "NEW" | "CONTACTED" | "INTERESTED" | "MEETING" | "VIEWING" | "NEGOTIATING" | "WON" | "LOST";
         /**
          * LeadUpdate
          * @description PATCH 用。所有欄位都是選填，只更新有帶的欄位。
