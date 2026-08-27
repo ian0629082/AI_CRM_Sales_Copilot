@@ -329,6 +329,8 @@ export interface components {
          *     分不出哪些是還沒認識、哪些是快跑掉了。
          */
         FollowUpResponse: {
+            /** Viewing Confirm */
+            viewing_confirm: components["schemas"]["FollowUpItem"][];
             /** New Uncontacted */
             new_uncontacted: components["schemas"]["FollowUpItem"][];
             /** Due */
@@ -396,6 +398,8 @@ export interface components {
             content: string;
             /** Next Follow Up Days */
             next_follow_up_days?: number | null;
+            /** Viewing Scheduled At */
+            viewing_scheduled_at?: string | null;
             /** Mute Follow Up */
             mute_follow_up?: boolean | null;
         };
@@ -505,6 +509,8 @@ export interface components {
             urgency: components["schemas"]["Urgency"] | null;
             /** Next Follow Up At */
             next_follow_up_at: string | null;
+            /** Viewing Scheduled At */
+            viewing_scheduled_at: string | null;
             /** Follow Up Muted */
             follow_up_muted: boolean;
             /** Lead Score */
@@ -600,6 +606,8 @@ export interface components {
             urgency: components["schemas"]["Urgency"] | null;
             /** Next Follow Up At */
             next_follow_up_at: string | null;
+            /** Viewing Scheduled At */
+            viewing_scheduled_at: string | null;
             /** Follow Up Muted */
             follow_up_muted: boolean;
             /** Lead Score */
@@ -666,6 +674,8 @@ export interface components {
             urgency?: components["schemas"]["Urgency"] | null;
             /** Next Follow Up At */
             next_follow_up_at?: string | null;
+            /** Viewing Scheduled At */
+            viewing_scheduled_at?: string | null;
             /** Follow Up Muted */
             follow_up_muted?: boolean | null;
         };

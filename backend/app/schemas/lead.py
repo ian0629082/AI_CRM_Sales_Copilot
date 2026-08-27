@@ -84,6 +84,9 @@ class LeadUpdate(BaseModel):
 
     # 業務可以隨時直接改提醒日或關掉提醒，不必透過新增互動
     next_follow_up_at: date | None = None
+    # 帶看改期或取消也走這裡。傳 null 代表取消（那筆帶看不算數了），
+    # 這跟「不帶這個欄位」不同 —— PATCH 用 exclude_unset 分得開兩者。
+    viewing_scheduled_at: datetime | None = None
     follow_up_muted: bool | None = None
 
 
@@ -113,6 +116,7 @@ class LeadRead(BaseModel):
     urgency: Urgency | None
 
     next_follow_up_at: date | None
+    viewing_scheduled_at: datetime | None
     follow_up_muted: bool
 
     lead_score: int | None
@@ -163,6 +167,9 @@ class FollowUpResponse(BaseModel):
     分不出哪些是還沒認識、哪些是快跑掉了。
     """
 
+    # 明天要帶看，今天得先確認。排在最前面，因為漏掉的代價最高 ——
+    # 客戶臨時有事沒講，業務白跑一趟，而那個下午本來可以帶另一組客戶。
+    viewing_confirm: list[FollowUpItem]
     new_uncontacted: list[FollowUpItem]
     due: list[FollowUpItem]
     # 業務主動關掉提醒的客戶數。

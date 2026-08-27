@@ -927,6 +927,13 @@
       },
       "FollowUpResponse": {
         "properties": {
+          "viewing_confirm": {
+            "items": {
+              "$ref": "#/components/schemas/FollowUpItem"
+            },
+            "type": "array",
+            "title": "Viewing Confirm"
+          },
           "new_uncontacted": {
             "items": {
               "$ref": "#/components/schemas/FollowUpItem"
@@ -948,6 +955,7 @@
         },
         "type": "object",
         "required": [
+          "viewing_confirm",
           "new_uncontacted",
           "due",
           "muted_count"
@@ -1033,6 +1041,18 @@
               }
             ],
             "title": "Next Follow Up Days"
+          },
+          "viewing_scheduled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewing Scheduled At"
           },
           "mute_follow_up": {
             "anyOf": [
@@ -1459,6 +1479,18 @@
             ],
             "title": "Next Follow Up At"
           },
+          "viewing_scheduled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewing Scheduled At"
+          },
           "follow_up_muted": {
             "type": "boolean",
             "title": "Follow Up Muted"
@@ -1556,6 +1588,7 @@
           "purchase_timeline",
           "urgency",
           "next_follow_up_at",
+          "viewing_scheduled_at",
           "follow_up_muted",
           "lead_score",
           "lead_level",
@@ -1783,6 +1816,18 @@
             ],
             "title": "Next Follow Up At"
           },
+          "viewing_scheduled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewing Scheduled At"
+          },
           "follow_up_muted": {
             "type": "boolean",
             "title": "Follow Up Muted"
@@ -1844,6 +1889,7 @@
           "purchase_timeline",
           "urgency",
           "next_follow_up_at",
+          "viewing_scheduled_at",
           "follow_up_muted",
           "lead_score",
           "lead_level",
@@ -2089,6 +2135,18 @@
               }
             ],
             "title": "Next Follow Up At"
+          },
+          "viewing_scheduled_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewing Scheduled At"
           },
           "follow_up_muted": {
             "anyOf": [

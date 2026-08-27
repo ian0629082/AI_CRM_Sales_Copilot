@@ -131,7 +131,7 @@ class LeadService:
         lead = self.get_lead(lead_id)
         self.repo.delete(lead)
 
-    def list_follow_ups(self, today: date | None = None) -> tuple[list, list, int]:
+    def list_follow_ups(self, today: date | None = None) -> tuple[list, list, list, int]:
         """算出今天的待跟進清單。
 
         判斷在 Python 裡做而不是寫成 SQL：規則有「有沒有互動紀錄」這種
@@ -143,13 +143,15 @@ class LeadService:
         today = today or date.today()
         leads = self.repo.list_for_follow_up(self.current_user.id)
 
-        new_uncontacted, due = [], []
+        viewing_confirm, new_uncontacted, due = [], [], []
         muted_count = 0
 
         for lead in leads:
             status = follow_up.evaluate(lead, list(lead.interactions), today)
             if status.bucket is follow_up.FollowUpBucket.MUTED:
                 muted_count += 1
+            elif status.bucket is follow_up.FollowUpBucket.VIEWING_CONFIRM:
+                viewing_confirm.append((lead, status))
             elif status.bucket is follow_up.FollowUpBucket.NEW_UNCONTACTED:
                 new_uncontacted.append((lead, status))
             elif status.bucket is follow_up.FollowUpBucket.DUE:
@@ -160,9 +162,12 @@ class LeadService:
             lead, status = item
             return (-status.days_overdue, -(lead.lead_score or 0))
 
+        # 帶看確認那一堆全部都是「明天」，沒有逾期天數可以排，
+        # 所以照帶看時間由早到晚排 —— 業務明天的行程本來就是照時間走的。
+        viewing_confirm.sort(key=lambda item: item[0].viewing_scheduled_at)
         new_uncontacted.sort(key=priority)
         due.sort(key=priority)
-        return new_uncontacted, due, muted_count
+        return viewing_confirm, new_uncontacted, due, muted_count
 
     # ------------------------------------------------------------------
     # AI 需求解析（Sprint 3）

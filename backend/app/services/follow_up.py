@@ -56,6 +56,13 @@ DEFAULT_FOLLOW_UP_DAYS: dict[InteractionType, int] = {
 # 房仲實務上第一時間回應的轉換率差很多，所以這個值很短。
 NEW_LEAD_GRACE_DAYS = 1
 
+# 帶看前幾天要提醒業務去跟客戶確認。
+#
+# 固定就是前一天，不做成可設定 —— 業務實務上這件事只有一個答案：
+# 更早確認，客戶那時候還說不準；當天才確認，他已經沒時間重新安排，
+# 確認了也來不及補救。
+VIEWING_CONFIRM_DAYS_BEFORE = 1
+
 # 已經結案的客戶不需要跟進提醒
 CLOSED_STATUSES = frozenset({LeadStatus.WON, LeadStatus.LOST})
 
@@ -70,6 +77,15 @@ class FollowUpBucket(str, Enum):
     """
 
     NEW_UNCONTACTED = "NEW_UNCONTACTED"  # 客戶填了表，還沒有人聯絡過他
+    # 明天要帶看，今天得先聯絡客戶確認。
+    #
+    # 為什麼獨立成第三堆，而不是併進 DUE：它對應的業務動作不一樣。
+    # DUE 是「這個客戶太久沒動了，去接觸一下」，可以晚一天；
+    # 這一堆是「你明天有個約，先確認對方還記得」，晚一天就是白跑一趟。
+    #
+    # 兩者混在一起的話，業務打開清單看到十個人，
+    # 分不出哪幾個是漏掉會浪費一個下午的。
+    VIEWING_CONFIRM = "VIEWING_CONFIRM"
     DUE = "DUE"  # 業務設的提醒日到了
     SCHEDULED = "SCHEDULED"  # 有提醒日，但還沒到
     MUTED = "MUTED"  # 業務明確關掉了提醒
@@ -85,7 +101,11 @@ class FollowUpStatus:
 
     @property
     def needs_attention(self) -> bool:
-        return self.bucket in (FollowUpBucket.NEW_UNCONTACTED, FollowUpBucket.DUE)
+        return self.bucket in (
+            FollowUpBucket.NEW_UNCONTACTED,
+            FollowUpBucket.VIEWING_CONFIRM,
+            FollowUpBucket.DUE,
+        )
 
 
 def default_follow_up_days(interaction_type: InteractionType) -> int:
@@ -108,6 +128,22 @@ def evaluate(
     # 一份會冒出你關過的人的待辦清單，沒有人敢信。
     if lead.follow_up_muted:
         return FollowUpStatus(FollowUpBucket.MUTED, 0, "已關閉提醒")
+
+    # 帶看前一天要先聯絡客戶確認。
+    #
+    # 這一條排在其他判斷之前（但仍在靜音之後），因為漏掉的代價最高：
+    # 客戶臨時有事卻沒講，業務白跑一趟，而那個下午本來可以帶另一組客戶。
+    #
+    # 只提醒前一天，不提醒當天 —— 當天才確認，客戶已經沒有時間重新安排，
+    # 確認了也來不及補救。這是業務實務判斷，不是技術限制。
+    if lead.viewing_scheduled_at is not None:
+        days_until = (lead.viewing_scheduled_at.date() - today).days
+        if days_until == VIEWING_CONFIRM_DAYS_BEFORE:
+            return FollowUpStatus(
+                FollowUpBucket.VIEWING_CONFIRM,
+                0,
+                f"明天 {lead.viewing_scheduled_at.strftime('%H:%M')} 帶看，今天要跟客戶確認",
+            )
 
     if not interactions:
         # 客戶填了表但還沒有人碰過他。這時業務沒有機會設提醒，只能由系統盯。

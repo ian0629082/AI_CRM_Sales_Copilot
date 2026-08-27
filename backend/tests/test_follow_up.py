@@ -324,3 +324,135 @@ def test_follow_ups_only_include_your_own_leads(client, other_client):
 
 def test_follow_ups_requires_login(anon_client):
     assert anon_client.get(f"{PREFIX}/leads/follow-ups").status_code == 401
+
+
+# ---------------------------------------------------------------- 帶看前確認
+
+
+def _viewing_at(days_from_today: int, hour: int = 14) -> datetime:
+    return datetime.combine(
+        TODAY + timedelta(days=days_from_today),
+        datetime.min.time().replace(hour=hour),
+        tzinfo=timezone.utc,
+    )
+
+
+def test_viewing_tomorrow_needs_confirming_today():
+    """明天要帶看，今天就要跟客戶確認一次。
+
+    這是業務實務規則：客戶臨時有事卻沒講，業務白跑一趟，
+    而那個下午本來可以帶另一組客戶。
+    """
+    lead = make_lead(created_days_ago=10, viewing_scheduled_at=_viewing_at(1, hour=15))
+
+    status = evaluate(lead, [interaction()], TODAY)
+
+    assert status.bucket is FollowUpBucket.VIEWING_CONFIRM
+    # 提醒文案要講得出幾點，不然業務還是得自己翻紀錄
+    assert "15:00" in status.reason
+
+
+def test_viewing_today_is_too_late_to_confirm():
+    """帶看當天不提醒。
+
+    當天才確認，客戶已經沒有時間重新安排，確認了也來不及補救。
+    這是實務判斷，不是技術限制。
+    """
+    lead = make_lead(created_days_ago=10, viewing_scheduled_at=_viewing_at(0))
+
+    assert evaluate(lead, [interaction()], TODAY).bucket is not FollowUpBucket.VIEWING_CONFIRM
+
+
+def test_viewing_further_out_does_not_nag():
+    """還有三天才帶看，今天不必吵業務。"""
+    lead = make_lead(created_days_ago=10, viewing_scheduled_at=_viewing_at(3))
+
+    assert evaluate(lead, [interaction()], TODAY).bucket is not FollowUpBucket.VIEWING_CONFIRM
+
+
+def test_viewing_confirm_beats_an_ordinary_due_reminder():
+    """同時是「到期跟進」也是「明天帶看」時，帶看確認優先。
+
+    兩者漏掉的代價差很多：一般提醒晚一天是少一次接觸，
+    帶看沒確認到是白跑一趟。
+    """
+    lead = make_lead(
+        created_days_ago=30,
+        next_follow_up_at=TODAY - timedelta(days=5),
+        viewing_scheduled_at=_viewing_at(1),
+    )
+
+    assert evaluate(lead, [interaction()], TODAY).bucket is FollowUpBucket.VIEWING_CONFIRM
+
+
+def test_muting_still_wins_over_viewing_confirm():
+    """業務明確關掉提醒的客戶，仍然不會冒出來。
+
+    一份會冒出你關過的人的待辦清單，沒有人敢信 ——
+    這條原則不能因為多了一種提醒就破例。
+    （真的關了提醒又約了帶看，那是資料不一致，不是這裡該補救的。）
+    """
+    lead = make_lead(
+        created_days_ago=30, follow_up_muted=True, viewing_scheduled_at=_viewing_at(1)
+    )
+
+    assert evaluate(lead, [interaction()], TODAY).bucket is FollowUpBucket.MUTED
+
+
+def test_closed_leads_never_get_viewing_reminders():
+    lead = make_lead(
+        created_days_ago=30, status=LeadStatus.WON, viewing_scheduled_at=_viewing_at(1)
+    )
+
+    assert evaluate(lead, [interaction()], TODAY).bucket is FollowUpBucket.CLOSED
+
+
+def test_recording_an_interaction_can_book_the_viewing(client):
+    """帶看時間在記錄互動時順手填 —— 那本來就是在通話中敲定的。"""
+    lead = client.post(f"{PREFIX}/leads", json={"name": "陳先生"}).json()
+    booked = (datetime.now(timezone.utc) + timedelta(days=1)).replace(microsecond=0)
+
+    client.post(
+        f"{PREFIX}/leads/{lead['id']}/interactions",
+        json={
+            "type": "CALL",
+            "content": "客戶說週六下午可以去看七期那間",
+            "viewing_scheduled_at": booked.isoformat(),
+        },
+    )
+
+    body = client.get(f"{PREFIX}/leads/follow-ups").json()
+    assert [i["lead"]["name"] for i in body["viewing_confirm"]] == ["陳先生"]
+
+
+def test_an_unrelated_interaction_does_not_clear_the_booking(client):
+    """補記一通不相干的電話，不該把客戶的看屋約洗掉。"""
+    lead = client.post(f"{PREFIX}/leads", json={"name": "林小姐"}).json()
+    booked = (datetime.now(timezone.utc) + timedelta(days=1)).replace(microsecond=0)
+
+    client.post(
+        f"{PREFIX}/leads/{lead['id']}/interactions",
+        json={"type": "CALL", "content": "約好了", "viewing_scheduled_at": booked.isoformat()},
+    )
+    client.post(
+        f"{PREFIX}/leads/{lead['id']}/interactions",
+        json={"type": "NOTE", "content": "順便記一下他問的管理費"},
+    )
+
+    detail = client.get(f"{PREFIX}/leads/{lead['id']}").json()
+    assert detail["viewing_scheduled_at"] is not None
+
+
+def test_cancelling_a_viewing_through_patch(client):
+    """帶看取消或改期走 PATCH，傳 null 代表這筆約不算數了。"""
+    lead = client.post(f"{PREFIX}/leads", json={"name": "王先生"}).json()
+    booked = (datetime.now(timezone.utc) + timedelta(days=1)).replace(microsecond=0)
+    client.post(
+        f"{PREFIX}/leads/{lead['id']}/interactions",
+        json={"type": "CALL", "content": "約好了", "viewing_scheduled_at": booked.isoformat()},
+    )
+
+    client.patch(f"{PREFIX}/leads/{lead['id']}", json={"viewing_scheduled_at": None})
+
+    body = client.get(f"{PREFIX}/leads/follow-ups").json()
+    assert body["viewing_confirm"] == []

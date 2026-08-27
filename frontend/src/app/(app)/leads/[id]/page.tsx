@@ -152,6 +152,8 @@ export default function LeadDetailPage() {
   const [interactionType, setInteractionType] = useState<InteractionType>("CALL");
   const [interactionContent, setInteractionContent] = useState("");
   const [followUpChoice, setFollowUpChoice] = useState(0);
+  // 這次通話有沒有談定帶看時間。空字串代表沒談到，不會動到原本約好的時間。
+  const [viewingAt, setViewingAt] = useState("");
 
   async function handleStatusChange(next: string | null) {
     if (!next) return;
@@ -174,11 +176,18 @@ export default function LeadDetailPage() {
         content: interactionContent.trim(),
         next_follow_up_days: choice.days,
         mute_follow_up: choice.mute ?? null,
+        // datetime-local 給的是沒有時區的字串，交給瀏覽器換成當地時間的 ISO
+        viewing_scheduled_at: viewingAt ? new Date(viewingAt).toISOString() : null,
       });
       setInteractionContent("");
       setFollowUpChoice(0);
+      setViewingAt("");
       toast.success(
-        choice.mute ? "已新增紀錄，並關閉這位客戶的提醒" : "已新增互動紀錄",
+        viewingAt
+          ? "已新增紀錄，帶看前一天會提醒你確認"
+          : choice.mute
+            ? "已新增紀錄，並關閉這位客戶的提醒"
+            : "已新增互動紀錄",
       );
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : "新增失敗");
@@ -192,6 +201,18 @@ export default function LeadDetailPage() {
     } catch {
       // 錯誤已經由 mutation 的 isError 狀態接手，在卡片裡就地顯示並附上重試按鈕。
       // 這裡只是避免 unhandled rejection。
+    }
+  }
+
+  async function handleCancelViewing() {
+    if (!window.confirm("取消這筆帶看約嗎？帶看前一天就不會再提醒你確認。")) {
+      return;
+    }
+    try {
+      await updateLead.mutateAsync({ viewing_scheduled_at: null });
+      toast.success("已取消帶看約");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "取消失敗");
     }
   }
 
@@ -613,6 +634,38 @@ export default function LeadDetailPage() {
                   ))}
                 </div>
 
+                {/* 帶看時間跟「下次提醒」放在一起，因為它們回答的是同一件事：
+                    這通電話講完，接下來什麼時候還要動作。
+                    不另開一個頁面設定 —— 多一個地方要點，就多一個忘記填的理由，
+                    而這一欄沒填的代價是白跑一趟。 */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground">已約帶看</span>
+                  <input
+                    type="datetime-local"
+                    value={viewingAt}
+                    onChange={(e) => setViewingAt(e.target.value)}
+                    className="rounded-md border border-input bg-transparent px-2 py-1 text-xs"
+                  />
+                  {viewingAt ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setViewingAt("")}
+                        className="text-xs text-muted-foreground hover:underline"
+                      >
+                        清除
+                      </button>
+                      <span className="text-xs text-muted-foreground">
+                        前一天會提醒你跟客戶確認
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      這次談定帶看時間才填
+                    </span>
+                  )}
+                </div>
+
                 <Button
                   type="submit"
                   size="sm"
@@ -717,6 +770,30 @@ export default function LeadDetailPage() {
               <CardTitle className="text-base">跟進提醒</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              {/* 帶看排在最上面。業務打開這張卡片時，
+                  「我明天有沒有跟這個人約」比「什麼時候該打給他」急得多。 */}
+              {lead.viewing_scheduled_at ? (
+                <div className="space-y-1 rounded-md border border-sky-300 bg-sky-50 p-3 dark:border-sky-900 dark:bg-sky-950/40">
+                  <p className="text-xs text-sky-900 dark:text-sky-200">📅 已約帶看</p>
+                  <p className="text-sm font-medium">
+                    {formatDateTime(lead.viewing_scheduled_at)}
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-xs text-muted-foreground">
+                      前一天會出現在待跟進清單，提醒你先確認
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleCancelViewing}
+                      disabled={updateLead.isPending}
+                      className="text-xs text-muted-foreground hover:underline"
+                    >
+                      取消
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
               {lead.follow_up_muted ? (
                 <div className="rounded-md bg-muted p-3 text-sm">
                   <p className="font-medium">🔕 已關閉提醒</p>

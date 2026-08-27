@@ -72,7 +72,7 @@ def list_follow_ups(service: LeadService = Depends(get_lead_service)):
     路由必須註冊在 /{lead_id} 之前，否則 "follow-ups" 會被當成 lead_id
     去比對，然後回一個看起來莫名其妙的 422。
     """
-    new_uncontacted, due, muted_count = service.list_follow_ups()
+    viewing_confirm, new_uncontacted, due, muted_count = service.list_follow_ups()
 
     def to_items(rows):
         return [
@@ -86,6 +86,7 @@ def list_follow_ups(service: LeadService = Depends(get_lead_service)):
         ]
 
     return FollowUpResponse(
+        viewing_confirm=to_items(viewing_confirm),
         new_uncontacted=to_items(new_uncontacted),
         due=to_items(due),
         muted_count=muted_count,

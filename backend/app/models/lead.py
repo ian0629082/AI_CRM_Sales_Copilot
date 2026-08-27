@@ -95,6 +95,24 @@ class Lead(Base):
     # 客戶掛電話前說「我下週三再回你」，業務填 7 天就對了，規則猜不到那句話。
     next_follow_up_at: Mapped[date | None] = mapped_column(Date, index=True)
 
+    # 已經跟客戶約好的帶看時間。
+    #
+    # 這是系統裡第一個「未來的行程」——互動紀錄記的都是已經發生的事，
+    # 存不進同一個地方。
+    #
+    # 為什麼要有它：業務實務上，帶看前一天一定要先聯絡客戶確認。
+    # 客戶臨時有事卻沒講，業務就白跑一趟；先確認一次，
+    # 也剛好是再接觸一次的機會。
+    #
+    # 存 datetime 而不是 date，是因為提醒文案要講得出「明天下午 3 點」——
+    # 只講「明天有帶看」，業務還是得自己翻紀錄找幾點。
+    #
+    # 放在 Lead 上而不是 Interaction 上：一位客戶同時只會有一個「下次帶看」，
+    # 而且跟進提醒的判斷本來就在讀 lead 的欄位。
+    viewing_scheduled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
+
     # 業務明確關掉提醒（成交、流失、確定放棄）。
     # 與 next_follow_up_at 為 NULL 分開表示：NULL 是「還沒設」，
     # 這個是「刻意不要」。兩者混在一起的話，就分不出「漏設」與「不用設」。
