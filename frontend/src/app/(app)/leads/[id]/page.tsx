@@ -100,6 +100,17 @@ function isAiFilled(lead: LeadDetail, field: RequirementField): boolean {
   return aiValue !== null && aiValue !== undefined && aiValue === lead[field];
 }
 
+/**
+ * 這個時間點是不是已經過了。
+ *
+ * 跟 isOverdue 不同，這裡要比到「幾點」而不是只比日期：
+ * 今天下午三點的帶看，在今天早上十點看還沒發生 ——
+ * 只比日期的話，業務一早打開頁面就會看到那場約被標成「上次帶看」。
+ */
+function hasPassed(isoDateTime: string): boolean {
+  return new Date(isoDateTime).getTime() < Date.now();
+}
+
 /** 提醒日是不是已經到了或過了。後端用同一條判斷決定要不要進待跟進清單。 */
 function isOverdue(isoDate: string): boolean {
   const today = new Date();
@@ -205,14 +216,23 @@ export default function LeadDetailPage() {
   }
 
   async function handleCancelViewing() {
-    if (!window.confirm("取消這筆帶看約嗎？帶看前一天就不會再提醒你確認。")) {
+    // 同一顆按鈕，在「還沒帶看」與「已經帶看完」兩種狀態下做的是不同的事：
+    // 前者是取消一個約（有後果），後者只是清掉一筆過期的紀錄。
+    // 用同一句話問，其中一種一定會讓人困惑。
+    const passed =
+      lead?.viewing_scheduled_at != null && hasPassed(lead.viewing_scheduled_at);
+    const message = passed
+      ? "清除這筆帶看紀錄嗎？"
+      : "取消這筆帶看約嗎？帶看前一天就不會再提醒你確認。";
+
+    if (!window.confirm(message)) {
       return;
     }
     try {
       await updateLead.mutateAsync({ viewing_scheduled_at: null });
-      toast.success("已取消帶看約");
+      toast.success(passed ? "已清除" : "已取消帶看約");
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "取消失敗");
+      toast.error(err instanceof ApiError ? err.message : "操作失敗");
     }
   }
 
@@ -772,26 +792,52 @@ export default function LeadDetailPage() {
             <CardContent className="space-y-3">
               {/* 帶看排在最上面。業務打開這張卡片時，
                   「我明天有沒有跟這個人約」比「什麼時候該打給他」急得多。 */}
+              {/* 帶看時間過了之後，這一塊要改口。
+                  一場已經發生的帶看還掛著「已約帶看　前一天會提醒你確認」，
+                  是在講一件不會發生的事 —— 業務看兩次就不會再信這張卡片。
+
+                  不自動清掉那個時間，是因為它仍然是有用的資訊：
+                  「上次帶看是 8/24」正是業務決定下一步時要看的東西。
+                  只是它已經從「待辦」變成了「歷史」，講法要跟著改。 */}
               {lead.viewing_scheduled_at ? (
-                <div className="space-y-1 rounded-md border border-sky-300 bg-sky-50 p-3 dark:border-sky-900 dark:bg-sky-950/40">
-                  <p className="text-xs text-sky-900 dark:text-sky-200">📅 已約帶看</p>
-                  <p className="text-sm font-medium">
-                    {formatDateTime(lead.viewing_scheduled_at)}
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <p className="text-xs text-muted-foreground">
-                      前一天會出現在待跟進清單，提醒你先確認
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleCancelViewing}
-                      disabled={updateLead.isPending}
-                      className="text-xs text-muted-foreground hover:underline"
-                    >
-                      取消
-                    </button>
+                hasPassed(lead.viewing_scheduled_at) ? (
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground">上次帶看</p>
+                    <div className="flex items-center gap-3">
+                      <p className="text-sm">
+                        {formatDateTime(lead.viewing_scheduled_at)}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleCancelViewing}
+                        disabled={updateLead.isPending}
+                        className="text-xs text-muted-foreground hover:underline"
+                      >
+                        清除
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="space-y-1 rounded-md border border-sky-300 bg-sky-50 p-3 dark:border-sky-900 dark:bg-sky-950/40">
+                    <p className="text-xs text-sky-900 dark:text-sky-200">📅 已約帶看</p>
+                    <p className="text-sm font-medium">
+                      {formatDateTime(lead.viewing_scheduled_at)}
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <p className="text-xs text-muted-foreground">
+                        前一天會出現在待跟進清單，提醒你先確認
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleCancelViewing}
+                        disabled={updateLead.isPending}
+                        className="text-xs text-muted-foreground hover:underline"
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                )
               ) : null}
 
               {lead.follow_up_muted ? (
