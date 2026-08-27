@@ -109,6 +109,15 @@ def build_lead(case: dict) -> Lead:
     if "next_follow_up_in_days" in case:
         next_follow_up = EVAL_TODAY + timedelta(days=case["next_follow_up_in_days"])
 
+    # 已約帶看。情境檔寫「幾天後、幾點」，這裡換成實際的 datetime——
+    # 資料集裡寫死日期的話，每次改 EVAL_TODAY 就要全部重算一次。
+    viewing_at = None
+    if "viewing_in_days" in case:
+        viewing_at = datetime.combine(
+            EVAL_TODAY + timedelta(days=case["viewing_in_days"]),
+            datetime.min.time().replace(hour=case.get("viewing_hour", 14)),
+        )
+
     lead = Lead(
         id=0,
         name=data["name"],
@@ -129,6 +138,7 @@ def build_lead(case: dict) -> Lead:
         purchase_timeline=data.get("purchase_timeline"),
         urgency=Urgency(data["urgency"]) if data.get("urgency") else None,
         next_follow_up_at=next_follow_up,
+        viewing_scheduled_at=viewing_at,
         follow_up_muted=False,
     )
     lead.created_at = datetime.combine(created, datetime.min.time())
@@ -272,6 +282,10 @@ def run_case(advisor: FollowUpAdvisor, judge_provider, case: dict):
         suggestion=raw,
         source_text=build_source_text(lead, recent),
         interaction_text="\n".join(i.content for i in recent),
+        # 用 Rule Engine 算出來的 bucket，而不是自己再判斷一次「明天是不是要帶看」。
+        # 判斷寫兩份，遲早會有一份跟正式流程不一致，
+        # 然後評估量的就不是使用者真正會看到的行為。
+        viewing_is_tomorrow=status.bucket is follow_up.FollowUpBucket.VIEWING_CONFIRM,
     )
 
     if judge_provider is not None:

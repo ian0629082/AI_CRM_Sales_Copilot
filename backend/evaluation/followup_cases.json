@@ -1,7 +1,7 @@
 {
   "meta": {
     "version": "v1",
-    "case_count": 12,
+    "case_count": 14,
     "purpose": "評估 AI 跟進建議（Sprint 5 後半）",
     "how_to_read": [
       "這份資料集跟 dataset.json 有一個根本差異：**它沒有 expected 欄位**。",
@@ -23,13 +23,17 @@
       "sparse: 客戶什麼都沒講 —— 考它會不會自己補一個聽起來合理的細節",
       "overdue: 拖很久沒聯絡 —— 考語氣拿不拿捏得住",
       "cold: 客戶明說不急 —— 考它會不會硬推",
-      "customer_scheduled: 客戶自己講了時間 —— 考建議時機會不會照他講的"
+      "customer_scheduled: 客戶自己講了時間 —— 考建議時機會不會照他講的",
+      "viewing_tomorrow: 明天要帶看 —— 考建議會不會叫業務先去確認那個約"
     ]
   },
   "cases": [
     {
       "id": "fu-001",
-      "tags": ["no_history", "hot"],
+      "tags": [
+        "no_history",
+        "hot"
+      ],
       "note": "新進未聯絡的高分客戶。沒有任何互動紀錄，正確的做法是建議第一次接觸，而不是假裝跟過。",
       "days_since_created": 2,
       "lead": {
@@ -50,7 +54,10 @@
     },
     {
       "id": "fu-002",
-      "tags": ["rich_history", "after_viewing"],
+      "tags": [
+        "rich_history",
+        "after_viewing"
+      ],
       "note": "帶看完隔天。互動紀錄裡有客戶對物件的具體反應，好的建議應該從那句話切入。",
       "days_since_created": 20,
       "next_follow_up_in_days": 0,
@@ -75,12 +82,19 @@
           "days_ago": 5,
           "content": "約週末看屋，客戶說她只有週六下午有空"
         },
-        { "type": "LINE", "days_ago": 9, "content": "傳了三間板橋的物件資料給她" }
+        {
+          "type": "LINE",
+          "days_ago": 9,
+          "content": "傳了三間板橋的物件資料給她"
+        }
       ]
     },
     {
       "id": "fu-003",
-      "tags": ["sparse", "cold_score"],
+      "tags": [
+        "sparse",
+        "cold_score"
+      ],
       "note": "客戶幾乎什麼都沒講。這一筆在考它會不會自己補細節——正確做法是建議去問，不是自己編。",
       "days_since_created": 3,
       "lead": {
@@ -93,7 +107,10 @@
     },
     {
       "id": "fu-004",
-      "tags": ["overdue", "rich_history"],
+      "tags": [
+        "overdue",
+        "rich_history"
+      ],
       "note": "逾期 12 天沒聯絡。語氣要拿捏——不能裝作昨天才聊過，也不必過度道歉。",
       "days_since_created": 60,
       "next_follow_up_in_days": -12,
@@ -123,7 +140,10 @@
     },
     {
       "id": "fu-005",
-      "tags": ["cold", "customer_said_not_urgent"],
+      "tags": [
+        "cold",
+        "customer_said_not_urgent"
+      ],
       "note": "客戶明說不急。硬推會把人推走，好的建議應該是低頻維繫。",
       "days_since_created": 40,
       "next_follow_up_in_days": 0,
@@ -147,7 +167,9 @@
     },
     {
       "id": "fu-006",
-      "tags": ["customer_scheduled"],
+      "tags": [
+        "customer_scheduled"
+      ],
       "note": "客戶自己講了下次聯絡的時間。建議時機應該照他說的，不是自己另外挑一天。",
       "days_since_created": 15,
       "next_follow_up_in_days": 0,
@@ -174,7 +196,10 @@
     },
     {
       "id": "fu-007",
-      "tags": ["no_history", "cold_score"],
+      "tags": [
+        "no_history",
+        "cold_score"
+      ],
       "note": "需求寫得清楚但明確說不急的新客戶。分數低，但不代表不用聯絡。",
       "days_since_created": 4,
       "lead": {
@@ -192,7 +217,10 @@
     },
     {
       "id": "fu-008",
-      "tags": ["rich_history", "objection"],
+      "tags": [
+        "rich_history",
+        "objection"
+      ],
       "note": "客戶提出了具體的疑慮（漏水、管理費）。建議應該正面處理那個疑慮。",
       "days_since_created": 35,
       "next_follow_up_in_days": -2,
@@ -213,12 +241,19 @@
           "days_ago": 4,
           "content": "客戶說她查到那個社區有漏水的糾紛，有點擔心，也覺得管理費偏高"
         },
-        { "type": "VIEWING", "days_ago": 8, "content": "帶看大安區那間，客戶很喜歡採光" }
+        {
+          "type": "VIEWING",
+          "days_ago": 8,
+          "content": "帶看大安區那間，客戶很喜歡採光"
+        }
       ]
     },
     {
       "id": "fu-009",
-      "tags": ["no_reply", "overdue"],
+      "tags": [
+        "no_reply",
+        "overdue"
+      ],
       "note": "連續兩次聯絡不上。建議應該換管道或換時段，不是再打一次一樣的電話。",
       "days_since_created": 25,
       "next_follow_up_in_days": -5,
@@ -233,13 +268,23 @@
         "purpose": "INVESTMENT"
       },
       "interactions": [
-        { "type": "CALL", "days_ago": 6, "content": "致電未接" },
-        { "type": "CALL", "days_ago": 9, "content": "致電未接，晚上七點打的" }
+        {
+          "type": "CALL",
+          "days_ago": 6,
+          "content": "致電未接"
+        },
+        {
+          "type": "CALL",
+          "days_ago": 9,
+          "content": "致電未接，晚上七點打的"
+        }
       ]
     },
     {
       "id": "fu-010",
-      "tags": ["only_interactions"],
+      "tags": [
+        "only_interactions"
+      ],
       "note": "沒有客戶原話，需求全記在互動裡（電話進線的客戶常常是這樣）。考它會不會只看空白的需求欄位。",
       "days_since_created": 8,
       "next_follow_up_in_days": 0,
@@ -258,7 +303,11 @@
     },
     {
       "id": "fu-011",
-      "tags": ["rich_history", "hot", "budget_gap"],
+      "tags": [
+        "rich_history",
+        "hot",
+        "budget_gap"
+      ],
       "note": "客戶的預算跟他想要的區域對不上。建議應該處理這個落差，而不是繼續找不存在的物件。",
       "days_since_created": 30,
       "next_follow_up_in_days": 0,
@@ -287,8 +336,78 @@
       ]
     },
     {
+      "id": "fu-013",
+      "tags": [
+        "viewing_tomorrow"
+      ],
+      "note": "明天下午三點要帶看。業務實務上帶看前一天一定要先確認——客戶臨時有事沒講，業務就白跑一趟。這一筆考建議會不會叫業務去確認，而不是講別的。",
+      "days_since_created": 12,
+      "viewing_in_days": 1,
+      "viewing_hour": 15,
+      "next_follow_up_in_days": 3,
+      "lead": {
+        "name": "郭先生",
+        "phone": "0955667788",
+        "status": "INTERESTED",
+        "raw_requirement": "想在竹北找三房，預算 1800 萬，自住，小孩明年要念國小",
+        "location": "竹北",
+        "budget_max": 18000000,
+        "rooms": 3,
+        "purpose": "SELF_USE"
+      },
+      "interactions": [
+        {
+          "type": "CALL",
+          "days_ago": 2,
+          "content": "跟客戶約好禮拜四下午三點看光明六路那間，他說會自己開車過去"
+        },
+        {
+          "type": "LINE",
+          "days_ago": 6,
+          "content": "傳了兩間竹北的物件資料"
+        }
+      ]
+    },
+    {
+      "id": "fu-014",
+      "tags": [
+        "viewing_tomorrow",
+        "no_reply"
+      ],
+      "note": "明天要帶看，但這位客戶前幾天才剛有一次沒接電話。確認的動作更重要——連絡不上又沒確認，白跑一趟的機率高很多。順便考它會不會改用 LINE。",
+      "days_since_created": 25,
+      "viewing_in_days": 1,
+      "viewing_hour": 11,
+      "next_follow_up_in_days": -1,
+      "lead": {
+        "name": "何小姐",
+        "phone": "0966778899",
+        "status": "INTERESTED",
+        "raw_requirement": "林口兩房，預算 1100 萬以內，投資收租，有電梯就好",
+        "location": "林口",
+        "budget_max": 11000000,
+        "rooms": 2,
+        "purpose": "INVESTMENT"
+      },
+      "interactions": [
+        {
+          "type": "CALL",
+          "days_ago": 3,
+          "content": "致電未接，改傳 LINE 她有回，約明天早上十一點看文化二路那間"
+        },
+        {
+          "type": "VIEWING",
+          "days_ago": 12,
+          "content": "帶看過林口另一間，客戶嫌車位太窄"
+        }
+      ]
+    },
+    {
       "id": "fu-012",
-      "tags": ["rich_history", "after_meeting"],
+      "tags": [
+        "rich_history",
+        "after_meeting"
+      ],
       "note": "面談完，客戶帶了家人一起看。建議應該考慮到決策者不只一個人。",
       "days_since_created": 45,
       "next_follow_up_in_days": -1,
@@ -309,7 +428,11 @@
           "days_ago": 3,
           "content": "客戶帶她先生和婆婆一起來看，婆婆說樓層太高她不喜歡，先生倒是覺得價格可以接受"
         },
-        { "type": "VIEWING", "days_ago": 6, "content": "帶看文山區那間十二樓的" }
+        {
+          "type": "VIEWING",
+          "days_ago": 6,
+          "content": "帶看文山區那間十二樓的"
+        }
       ]
     }
   ]

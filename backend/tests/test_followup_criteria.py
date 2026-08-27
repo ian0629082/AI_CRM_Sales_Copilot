@@ -17,6 +17,7 @@ from evaluation.followup_criteria import (
     check_numbers_grounded,
     check_timing_matches_appointment,
     check_uses_history,
+    check_viewing_confirmed,
     evaluate_case,
 )
 
@@ -307,3 +308,27 @@ def test_criteria_are_not_weighted_into_one_score():
         "actionable",
         "numbers_grounded",
     }
+
+
+# ---------------------------------------------------------------- 帶看確認
+
+
+def test_viewing_confirmation_is_required_the_day_before():
+    """明天要帶看，建議卻在講別的——這條要抓的就是這個。"""
+    result = check_viewing_confirmed(
+        "致電了解他對林口的看法", "何小姐，想跟您聊聊林口那邊的行情⋯⋯", True
+    )
+    assert result.verdict is Verdict.FAIL
+
+
+def test_confirming_the_viewing_passes():
+    result = check_viewing_confirmed(
+        "致電確認明天帶看的時間", "郭先生，跟您確認一下明天下午三點看屋還方便嗎？", True
+    )
+    assert result.verdict is Verdict.PASS
+
+
+def test_no_viewing_tomorrow_is_not_applicable():
+    """這條判準只在帶看前一天有意義，其他日子不適用。"""
+    result = check_viewing_confirmed("致電了解他的需求", "您好⋯⋯", False)
+    assert result.verdict is Verdict.NOT_APPLICABLE

@@ -390,6 +390,17 @@ def build_context(
 
     lines.append(f"目前狀態：{lead.status.value}")
 
+    # 已經約好的帶看時間。
+    #
+    # 這一行看起來多餘（下面的【跟進狀態】也會提到「明天帶看」），
+    # 但那句話只在**前一天**才會出現。帶看還有三天時，
+    # 沒有這一行的話模型完全不知道這個約存在，
+    # 於是它會建議一個跟那個約無關、甚至撞在一起的下一步。
+    if lead.viewing_scheduled_at is not None:
+        lines.append(
+            f"已約帶看：{lead.viewing_scheduled_at.strftime('%Y-%m-%d %H:%M')}"
+        )
+
     # 分數與理由都是 Rule Engine 算好的，模型只是拿來當背景，不需要自己判斷。
     lines += [
         "",

@@ -318,6 +318,41 @@ def check_timing_matches_appointment(
     )
 
 
+# 「確認帶看」這件事講得出來的說法。
+# 動詞跟受詞分開比對，是因為「跟她確認明天看屋的時間」與
+# 「確認一下明天帶看還算數嗎」都算數，但字面上沒有共同的片語。
+_CONFIRM_VERBS = ("確認", "確定", "再確認", "跟他確認", "跟她確認")
+_VIEWING_NOUNS = ("帶看", "看屋", "看房", "賞屋", "約看", "明天")
+
+
+def check_viewing_confirmed(
+    next_action: str, talking_point: str, viewing_is_tomorrow: bool
+) -> CriterionResult:
+    """明天要帶看的客戶，建議必須是去確認那個約。
+
+    這條判準守的是一條業務實務規則：帶看前一天一定要先聯絡客戶確認。
+    客戶臨時有事卻沒講，業務白跑一趟，而那個下午本來可以帶另一組客戶。
+
+    為什麼要有這條判準：規則已經寫進 prompt 了，但**沒有人在驗它有沒有照做**。
+    只寫 prompt 不寫判準，等於把規則交給模型的心情；
+    只寫判準不寫 prompt，則是抓錯不修錯。兩邊都要有。
+
+    沒有帶看約的案例回 N/A —— 這條判準只在那一天有意義。
+    """
+    if not viewing_is_tomorrow:
+        return CriterionResult("viewing_confirmed", Verdict.NOT_APPLICABLE, "明天沒有帶看")
+
+    text = f"{next_action}　{talking_point}"
+    if any(v in text for v in _CONFIRM_VERBS) and any(n in text for n in _VIEWING_NOUNS):
+        return CriterionResult("viewing_confirmed", Verdict.PASS)
+
+    return CriterionResult(
+        "viewing_confirmed",
+        Verdict.FAIL,
+        f"明天就要帶看，建議卻沒有叫業務去確認：「{next_action}」",
+    )
+
+
 @dataclass
 class FollowUpCaseResult:
     """一筆案例的評估結果。"""
@@ -351,6 +386,7 @@ def evaluate_case(
     suggestion: dict,
     source_text: str,
     interaction_text: str,
+    viewing_is_tomorrow: bool = False,
 ) -> FollowUpCaseResult:
     """對一則建議跑完第一層的四條判準。
 
@@ -372,6 +408,11 @@ def evaluate_case(
             check_timing_matches_appointment(
                 suggestion.get("suggested_timing", ""), source_text
             ),
+            check_viewing_confirmed(
+                suggestion.get("next_action", ""),
+                suggestion.get("talking_point", ""),
+                viewing_is_tomorrow,
+            ),
         ],
     )
 
@@ -379,6 +420,7 @@ def evaluate_case(
 # 報告裡判準的排列順序，由重要到次要
 CRITERIA_ORDER: tuple[str, ...] = (
     "grounding",
+    "viewing_confirmed",
     "timing_matches",
     "uses_history",
     "actionable",
@@ -387,6 +429,7 @@ CRITERIA_ORDER: tuple[str, ...] = (
 
 CRITERIA_LABELS: dict[str, str] = {
     "grounding": "引用有出處（沒有捏造）",
+    "viewing_confirmed": "明天帶看要叫業務去確認",
     "timing_matches": "時機對得上客戶約的時間",
     "uses_history": "有用到互動歷史",
     "actionable": "下一步是具體動作",
