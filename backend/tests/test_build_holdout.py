@@ -6,16 +6,22 @@
 跟 test_evaluation_metrics.py、test_followup_criteria.py 是同一個理由存在的。
 """
 
+from datetime import date
+
 import pytest
 
 from scripts.build_holdout import (
     FormError,
     parse_block,
+    parse_date,
+    parse_days_ago,
     parse_interaction,
     parse_money,
     parse_viewing,
     split_blocks,
 )
+
+ANCHOR = date(2026, 8, 27)
 
 FILLED = """
 === 第 1 位 ===
@@ -23,7 +29,7 @@ FILLED = """
 姓名：陳先生
 電話：0912345678
 狀態：有興趣
-建檔幾天了：20
+建檔日期：8/7
 
 客戶原話：想在竹北找三房，預算抓一千八，小孩明年要念國小
 
@@ -36,26 +42,26 @@ FILLED = """
 目的：自住
 急迫：急
 
-下次提醒：-3
-已約帶看：1 15
+下次提醒：8/24
+已約帶看：8/28 15:00
 
 互動紀錄（最新的寫最上面，一行一筆，沒有就整段留空）
-2天前 電話 跟他約好禮拜四下午看光明六路那間
-6天前 LINE 傳了兩間竹北的資料給他
+8/25 電話 跟他約好禮拜四下午看光明六路那間
+8/21 LINE 傳了兩間竹北的資料給他
 --- 這一位結束 ---
 """
 
 
 def _parse_first(text: str):
     title, lines = split_blocks(text)[0]
-    return parse_block(title, lines, 1)
+    return parse_block(title, lines, 1, ANCHOR)
 
 
 def test_a_filled_block_becomes_a_case():
     case = _parse_first(FILLED)
 
     assert case["id"] == "hold-001"
-    assert case["days_since_created"] == 20
+    assert case["days_since_created"] == 20  # 8/7 到 8/27
     assert case["next_follow_up_in_days"] == -3
     assert case["viewing_in_days"] == 1
     assert case["viewing_hour"] == 15
@@ -164,7 +170,7 @@ def test_unreadable_budget_is_caught():
 
 
 def test_interaction_line():
-    item = parse_interaction("3天前 電話 客戶說他還在考慮，叫我下週再打給他")
+    item = parse_interaction("3天前 電話 客戶說他還在考慮，叫我下週再打給他", ANCHOR)
     assert item == {
         "type": "CALL",
         "days_ago": 3,
@@ -174,19 +180,19 @@ def test_interaction_line():
 
 def test_interaction_line_missing_content_is_caught():
     """漏了內容要當場講清楚該怎麼寫，不要只說「格式錯誤」。"""
-    with pytest.raises(FormError, match="幾天前"):
-        parse_interaction("3天前 電話")
+    with pytest.raises(FormError, match="看不懂"):
+        parse_interaction("3天前 電話", ANCHOR)
 
 
 def test_viewing_needs_both_day_and_hour():
-    assert parse_viewing("1 15") == (1, 15)
-    with pytest.raises(FormError, match="兩個數字"):
-        parse_viewing("明天")
+    assert parse_viewing("1 15", ANCHOR) == (1, 15)
+    with pytest.raises(FormError, match="看不懂"):
+        parse_viewing("明天", ANCHOR)
 
 
 def test_viewing_hour_must_be_a_real_hour():
     with pytest.raises(FormError, match="0～23"):
-        parse_viewing("1 35")
+        parse_viewing("1 35", ANCHOR)
 
 
 def test_decorative_separators_do_not_start_a_block():
@@ -268,3 +274,70 @@ def test_content_on_the_interactions_header_line_is_an_error():
     title, lines = split_blocks(text)[0]
     with pytest.raises(FormError, match="不要直接寫內容"):
         parse_block(title, lines, 1)
+
+
+# ---------------------------------------------------------------- 日期
+
+
+def test_dates_are_converted_relative_to_the_anchor():
+    """表格裡寫日期，程式換算成相對天數。
+
+    業務在 CRM 裡看到的是日期，腦子裡想的也是日期。
+    逼他自己換算成「幾天前」，是拿程式的方便去換他的麻煩 ——
+    而且換算錯了不會有人發現。
+    """
+    text = """
+=== 第 1 位 ===
+姓名：胡小姐
+狀態：已聯絡
+建檔日期：8/25
+下次提醒：8/30
+已約帶看：8/28 15:00
+
+互動紀錄（一行一筆）
+8/26 電話 已聯繫上，問完需求
+8/20 LINE 傳了兩間資料給她
+--- 這一位結束 ---
+"""
+    title, lines = split_blocks(text)[0]
+    case = parse_block(title, lines, 1, ANCHOR)
+
+    assert case["days_since_created"] == 2
+    assert case["next_follow_up_in_days"] == 3
+    assert case["viewing_in_days"] == 1
+    assert case["viewing_hour"] == 15
+    assert [i["days_ago"] for i in case["interactions"]] == [1, 7]
+
+
+def test_a_past_reminder_date_means_overdue():
+    """提醒日已經過了，就是逾期 —— 不必逼人去寫負數。"""
+    text = """
+=== 第 1 位 ===
+姓名：王先生
+狀態：新進
+建檔日期：8/1
+下次提醒：8/22
+--- 這一位結束 ---
+"""
+    title, lines = split_blocks(text)[0]
+    assert parse_block(title, lines, 1, ANCHOR)["next_follow_up_in_days"] == -5
+
+
+def test_month_day_without_year_looks_backwards():
+    """一月時寫 12/28，指的是去年 —— 不是十一個月後。"""
+    assert parse_date("12/28", date(2026, 1, 10), prefer_past=True) == date(2025, 12, 28)
+
+
+def test_the_old_days_ago_wording_still_works():
+    """舊的「3天前」寫法要繼續能用。
+
+    表格改版不該讓已經填好的人重填 —— 那是最容易讓人直接放棄的事。
+    """
+    assert parse_days_ago("3天前", ANCHOR) == 3
+    assert parse_days_ago("8/24", ANCHOR) == 3
+
+
+def test_a_future_interaction_date_is_caught():
+    """互動紀錄是已經發生的事，日期不能比基準日晚。"""
+    with pytest.raises(FormError, match="比基準日還晚"):
+        parse_interaction("9/5 電話 明天要打的", ANCHOR)

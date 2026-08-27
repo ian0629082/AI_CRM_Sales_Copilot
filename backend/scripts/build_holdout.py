@@ -27,6 +27,7 @@ import json
 import pathlib
 import re
 import sys
+from datetime import date
 
 BACKEND_DIR = pathlib.Path(__file__).resolve().parents[1]
 FORM_PATH = BACKEND_DIR / "evaluation" / "holdout_form.txt"
@@ -83,6 +84,80 @@ INTERACTION_TYPE = {
 
 class FormError(Exception):
     """填表的內容有問題。訊息要講得出「哪一位、哪一行、該怎麼改」。"""
+
+
+# 表格最上面那行「今天：2026-08-27」。
+#
+# 為什麼需要一個基準日：評估跑起來時的「今天」是固定的
+# （見 evaluate_followup.EVAL_TODAY），這樣同一份資料集在不同日子跑
+# 才會得到可以互相比較的結果。
+#
+# 所以表格裡寫的日期要換算成「距離今天幾天」。
+# 換算由程式做，填表的人照常寫日期就好 ——
+# 他在 CRM 裡看到的是日期，腦子裡想的也是日期，不是「幾天前」。
+TODAY_LINE = re.compile(r"^今天[：:]\s*(\S+)")
+
+_DATE_PATTERNS = (
+    (re.compile(r"^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$"), True),  # 2026-08-25
+    (re.compile(r"^(\d{1,2})[-/.](\d{1,2})$"), False),  # 8/25
+)
+
+
+def parse_date(text: str, anchor: date, *, prefer_past: bool = False) -> date | None:
+    """把「2026-08-25」或「8/25」換成日期。看不出是日期就回 None。
+
+    只寫月日時年份取基準日的年。`prefer_past` 決定跨年怎麼猜：
+
+    - 過去的欄位（互動紀錄、建檔日期）要 prefer_past=True：
+      一月時寫「12/28 打的電話」，指的是去年十二月。
+    - 未來的欄位（下次提醒、已約帶看）不能開：
+      基準日 8/27 寫「8/30 要帶看」，那是三天後，不是去年八月。
+
+    這兩種欄位用同一條規則的話，其中一種一定會錯 ——
+    而錯的方式是資料悄悄差了一整年，程式不會有任何抱怨。
+    """
+    text = text.strip()
+    for pattern, has_year in _DATE_PATTERNS:
+        match = pattern.match(text)
+        if not match:
+            continue
+        if has_year:
+            year, month, day = (int(g) for g in match.groups())
+        else:
+            month, day = (int(g) for g in match.groups())
+            year = anchor.year
+        try:
+            parsed = date(year, month, day)
+        except ValueError as exc:
+            raise FormError(f"日期看不懂：「{text}」") from exc
+        # 只有「明顯不可能是今年」時才往前推一年。
+        #
+        # 一開始寫成「只要比基準日晚就推去年」，結果打錯字的日期
+        # （基準日 8/27，互動紀錄寫成 9/5）被悄悄變成 2025-09-05，
+        # 也就是「356 天前」—— 資料差了整整一年，而程式一句話都沒說。
+        #
+        # 現在只有超過 90 天才推：一月寫 12/28 確實是去年，
+        # 而差幾天的未來日期會留在原地，讓上層擋下來報錯。
+        if prefer_past and not has_year and (parsed - anchor).days > 90:
+            parsed = date(year - 1, month, day)
+        return parsed
+    return None
+
+
+def parse_days_ago(text: str, anchor: date) -> int | None:
+    """「3天前」或「8/25」→ 距離基準日幾天前。"""
+    text = text.strip()
+    if not text:
+        return None
+
+    parsed = parse_date(text, anchor, prefer_past=True)
+    if parsed is not None:
+        return (anchor - parsed).days
+
+    match = re.match(r"^(\d+)\s*天前$", text)
+    if match:
+        return int(match.group(1))
+    return None
 
 
 def parse_money(text: str) -> tuple[int | None, int | None]:
@@ -146,35 +221,73 @@ def pick(table: dict, text: str, label: str):
     raise FormError(f"{label} 看不懂：「{text}」。可以填：{'／'.join(table)}")
 
 
-def parse_viewing(text: str) -> tuple[int, int] | None:
-    """「1 15」→ 明天 15 點。"""
+def parse_viewing(text: str, anchor: date) -> tuple[int, int] | None:
+    """「8/28 15:00」或「1 15」→ (距今幾天, 幾點)。"""
     text = text.strip()
     if not text:
         return None
+
+    parts = text.split()
+    # 先試日期寫法：「8/28 15:00」「2026-08-28 下午3點」
+    if len(parts) >= 2:
+        parsed = parse_date(parts[0], anchor)
+        if parsed is not None:
+            hour_text = " ".join(parts[1:])
+            hour_match = re.search(r"(\d{1,2})", hour_text)
+            if not hour_match:
+                raise FormError(f"帶看時間看不懂幾點：「{hour_text}」，例如 15:00")
+            hour = int(hour_match.group(1))
+            _check_hour(hour)
+            return (parsed - anchor).days, hour
+
     numbers = re.findall(r"\d+", text)
     if len(numbers) < 2:
         raise FormError(
-            f"已約帶看要填兩個數字（幾天後、幾點），現在填的是：「{text}」。"
-            "例如「1 15」代表明天下午三點"
+            f"已約帶看看不懂：「{text}」\n"
+            "  可以寫日期加時間，例如  8/28 15:00\n"
+            "  或寫「幾天後 幾點」，例如  1 15  （明天下午三點）"
         )
     day, hour = int(numbers[0]), int(numbers[1])
-    if not 0 <= hour <= 23:
-        raise FormError(f"帶看時間的「幾點」要在 0～23 之間，現在是 {hour}")
+    _check_hour(hour)
     return day, hour
 
 
-def parse_interaction(line: str) -> dict:
-    """「3天前 電話 客戶說他還在考慮」→ 一筆互動紀錄。"""
-    match = re.match(r"^\s*(\d+)\s*天前\s+(\S+)\s+(.+)$", line)
+def _check_hour(hour: int) -> None:
+    if not 0 <= hour <= 23:
+        raise FormError(f"帶看時間的「幾點」要在 0～23 之間，現在是 {hour}")
+
+
+def parse_interaction(line: str, anchor: date) -> dict:
+    """「8/25 電話 客戶說他還在考慮」→ 一筆互動紀錄。
+
+    日期跟「3天前」兩種寫法都收。
+    業務在 CRM 裡看到的是日期，腦子裡想的也是日期 ——
+    逼他自己換算成「幾天前」，是拿程式的方便去換他的麻煩，
+    而且換算錯了不會有人發現。
+    """
+    match = re.match(r"^\s*(\S+)\s+(\S+)\s+(.+)$", line)
     if not match:
         raise FormError(
             f"互動紀錄這一行看不懂：「{line.strip()}」\n"
-            "  格式是：幾天前 + 管道 + 內容，例如\n"
-            "  3天前 電話 客戶說他還在考慮，叫我下週再打給他"
+            "  格式是：日期 + 管道 + 內容，例如\n"
+            "  8/25 電話 客戶說他還在考慮，叫我下週再打給他"
         )
-    days_ago, channel, content = match.groups()
+    when, channel, content = match.groups()
+
+    days_ago = parse_days_ago(when, anchor)
+    if days_ago is None:
+        raise FormError(
+            f"互動紀錄的日期看不懂：「{when}」（這一行：{line.strip()}）\n"
+            "  可以寫  8/25  或  2026-08-25  或  3天前"
+        )
+    if days_ago < 0:
+        raise FormError(
+            f"互動紀錄的日期「{when}」比基準日還晚。\n"
+            "  互動紀錄是已經發生的事；還沒發生的帶看請填在「已約帶看」"
+        )
+
     kind = pick(INTERACTION_TYPE, channel, "互動管道")
-    return {"type": kind, "days_ago": int(days_ago), "content": content.strip()}
+    return {"type": kind, "days_ago": days_ago, "content": content.strip()}
 
 
 def split_blocks(raw: str) -> list[tuple[str, list[str]]]:
@@ -202,8 +315,11 @@ def split_blocks(raw: str) -> list[tuple[str, list[str]]]:
     return blocks
 
 
-def parse_block(title: str, lines: list[str], index: int) -> dict | None:
+def parse_block(
+    title: str, lines: list[str], index: int, anchor: date | None = None
+) -> dict | None:
     """一位客戶。整段都沒填就回 None（表格裡沒用到的空位）。"""
+    anchor = anchor or date.today()
     fields: dict[str, str] = {}
     interactions: list[dict] = []
     in_interactions = False
@@ -230,8 +346,8 @@ def parse_block(title: str, lines: list[str], index: int) -> dict | None:
             if leftover:
                 raise FormError(
                     f"「互動紀錄」這四個字後面不要直接寫內容：「{leftover}」\n"
-                    "  請換到下一行，並且加上「幾天前」和管道，例如\n"
-                    "  2天前 電話 已聯繫上，問完需求，有適合的案件再跟他連絡"
+                    "  請換到下一行，並且加上日期和管道，例如\n"
+                    "  8/25 電話 已聯繫上，問完需求，有適合的案件再跟他連絡"
                 )
             continue
 
@@ -242,7 +358,7 @@ def parse_block(title: str, lines: list[str], index: int) -> dict | None:
             continue
 
         if in_interactions:
-            interactions.append(parse_interaction(stripped))
+            interactions.append(parse_interaction(stripped, anchor))
             continue
 
         if "：" in stripped or ":" in stripped:
@@ -281,19 +397,36 @@ def parse_block(title: str, lines: list[str], index: int) -> dict | None:
     # 「客戶沒提到」在計分上跟「沒有這個鍵」是同一件事，少一堆 null 也好讀得多。
     lead.update({k: v for k, v in optional.items() if v not in (None, "")})
 
+    # 建檔日期收兩種寫法。「建檔幾天了」是舊版表格的欄位，
+    # 已經填過的人不該因為表格改版就得重填。
+    created = fields.get("建檔日期", "").strip()
+    if created:
+        days_since = parse_days_ago(created, anchor)
+        if days_since is None:
+            raise FormError(f"建檔日期看不懂：「{created}」，可以寫 8/25 或 2026-08-25")
+    else:
+        days_since = parse_int(fields.get("建檔幾天了", ""), "建檔幾天了")
+
     case: dict = {
         "id": f"hold-{index:03d}",
         "tags": [],
-        "days_since_created": parse_int(fields.get("建檔幾天了", ""), "建檔幾天了") or 1,
+        "days_since_created": days_since if days_since is not None else 1,
         "lead": lead,
         "interactions": interactions,
     }
 
-    reminder = parse_int(fields.get("下次提醒", ""), "下次提醒")
-    if reminder is not None:
-        case["next_follow_up_in_days"] = reminder
+    # 下次提醒：日期，或「幾天後」（負數代表已經逾期）。
+    reminder_text = fields.get("下次提醒", "").strip()
+    if reminder_text:
+        reminder_date = parse_date(reminder_text, anchor)
+        if reminder_date is not None:
+            case["next_follow_up_in_days"] = (reminder_date - anchor).days
+        else:
+            reminder = parse_int(reminder_text, "下次提醒")
+            if reminder is not None:
+                case["next_follow_up_in_days"] = reminder
 
-    viewing = parse_viewing(fields.get("已約帶看", ""))
+    viewing = parse_viewing(fields.get("已約帶看", ""), anchor)
     if viewing is not None:
         case["viewing_in_days"], case["viewing_hour"] = viewing
 
@@ -305,13 +438,31 @@ def main() -> int:
         print(f"找不到 {FORM_PATH}", file=sys.stderr)
         return 1
 
-    blocks = split_blocks(FORM_PATH.read_text(encoding="utf-8"))
+    raw = FORM_PATH.read_text(encoding="utf-8")
+
+    # 表格最上面的「今天：2026-08-27」。沒寫就用真正的今天。
+    anchor = date.today()
+    for line in raw.splitlines():
+        match = TODAY_LINE.match(line.strip())
+        if match:
+            parsed = parse_date(match.group(1), date.today())
+            if parsed is None:
+                print(
+                    f"最上面那行的「今天」看不懂：「{match.group(1)}」，"
+                    "請寫成 2026-08-27",
+                    file=sys.stderr,
+                )
+                return 1
+            anchor = parsed
+            break
+
+    blocks = split_blocks(raw)
     cases: list[dict] = []
     errors: list[str] = []
 
     for title, lines in blocks:
         try:
-            case = parse_block(title, lines, len(cases) + 1)
+            case = parse_block(title, lines, len(cases) + 1, anchor)
         except FormError as exc:
             errors.append(f"【{title}】{exc}")
             continue
@@ -342,6 +493,9 @@ def main() -> int:
             "purpose": "跟進建議的 held-out 驗證集",
             "source": "由具房仲業務實務經驗、且未讀過 prompt 的人出題",
             "generated_from": FORM_PATH.name,
+            # 表格裡寫的是日期，這裡存下當時的基準日，
+            # 日後要對照「這一筆的互動到底是哪一天」才查得回去。
+            "form_today": anchor.isoformat(),
             "how_to_read": [
                 "這份**只用來量測，永遠不拿來調 prompt**。",
                 "它的全部價值來自「從沒影響過任何決定」——",
