@@ -16,6 +16,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
+from app.models.ai_analysis import FOLLOW_UP, REQUIREMENT_PARSING
 from app.models.enums import (
     LeadLevel,
     LeadSource,
@@ -133,11 +134,26 @@ class Lead(Base):
         order_by="AIAnalysis.id.desc()",
     )
 
-    @property
-    def latest_analysis(self):
-        """最近一次 AI 分析。ai_analyses 已由新到舊排序，取第一筆即可。
+    def _latest_of(self, analysis_type: str):
+        """ai_analyses 已由新到舊排序，取第一筆符合類型的即可。
+
+        **一定要過濾 analysis_type。**
+        這張表同時存需求解析與跟進建議兩種紀錄，
+        不過濾的話，業務按一次「AI 跟進建議」之後，
+        欄位上的「AI 解析」徽章就會全部消失 —— 因為最新那一筆變成了建議，
+        它的 parsed_result 是 null，比對不到任何欄位。
 
         放在 model 上而不是 service 裡：這是「Lead 這個東西本身的性質」，
         每個需要它的地方（API、日後的 n8n、Agent）都能直接用，不必各自再寫一次。
         """
-        return self.ai_analyses[0] if self.ai_analyses else None
+        return next((a for a in self.ai_analyses if a.analysis_type == analysis_type), None)
+
+    @property
+    def latest_analysis(self):
+        """最近一次需求解析。前端靠它決定哪些欄位要掛「AI 解析」徽章。"""
+        return self._latest_of(REQUIREMENT_PARSING)
+
+    @property
+    def latest_follow_up(self):
+        """最近一次跟進建議。"""
+        return self._latest_of(FOLLOW_UP)

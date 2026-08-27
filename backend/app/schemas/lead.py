@@ -18,7 +18,7 @@ from app.models.enums import (
     Purpose,
     Urgency,
 )
-from app.schemas.ai import AIAnalysisRead
+from app.schemas.ai import AIAnalysisRead, FollowUpAnalysisRead
 from app.schemas.interaction import InteractionRead
 
 
@@ -186,6 +186,8 @@ class LeadDetail(LeadRead):
     # 最近一次 AI 解析。前端靠它決定哪些欄位要掛「AI 解析」徽章，
     # 重新整理頁面後徽章也還在（不是只存在前端記憶體裡的狀態）。
     latest_analysis: AIAnalysisRead | None = None
+    # 最近一則 AI 跟進建議。重新整理後仍然看得到，不必再花一次錢重產。
+    latest_follow_up: FollowUpAnalysisRead | None = None
 
 
 class LeadAnalyzeResponse(BaseModel):
@@ -197,3 +199,14 @@ class LeadAnalyzeResponse(BaseModel):
 
     lead: LeadRead
     analysis: AIAnalysisRead
+
+
+class LeadFollowUpResponse(BaseModel):
+    """POST /leads/{id}/follow-up-suggestion 的回應。
+
+    只回建議，不回 lead —— 因為產生建議不會改到客戶的任何欄位，
+    前端手上那份資料仍然是對的，沒必要多傳一份回去。
+    這跟 analyze 的回應刻意不一樣，差異本身就在說明兩支 API 的性質不同。
+    """
+
+    suggestion: FollowUpAnalysisRead

@@ -13,30 +13,36 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import AIServiceError, NotFoundError, ValidationError
-from app.models.ai_analysis import AIAnalysis
+from app.models.ai_analysis import FOLLOW_UP, REQUIREMENT_PARSING, AIAnalysis
 from app.models.enums import LeadStatus
 from app.models.lead import Lead
 from app.models.user import User
 from app.repositories.ai_analysis_repository import AIAnalysisRepository
 from app.repositories.lead_repository import LeadRepository
 from app.schemas.lead import LeadCreate, LeadUpdate
-from app.services import follow_up
+from app.services import follow_up, follow_up_advisor
 from app.services.ai_service import AIService
+from app.services.follow_up_advisor import FollowUpAdvisor
 from app.services.scoring_service import calculate_score
 
 logger = logging.getLogger(__name__)
 
-REQUIREMENT_PARSING = "REQUIREMENT_PARSING"
-
 
 class LeadService:
-    def __init__(self, db: Session, current_user: User, ai_service: AIService | None = None):
+    def __init__(
+        self,
+        db: Session,
+        current_user: User,
+        ai_service: AIService | None = None,
+        advisor: FollowUpAdvisor | None = None,
+    ):
         self.repo = LeadRepository(db)
         self.analysis_repo = AIAnalysisRepository(db)
         self.current_user = current_user
-        # AI 是選配的。沒有設定 OPENAI_API_KEY 時 ai_service 是 None，
+        # AI 是選配的。沒有設定 OPENAI_API_KEY 時這兩個都是 None，
         # CRM 的其他功能照常運作 —— 這正是「AI 是 Enhancement，不是地基」的具體寫法。
         self.ai_service = ai_service
+        self.advisor = advisor
 
     def create_lead(self, payload: LeadCreate) -> Lead:
         lead = Lead(**payload.model_dump(), owner_id=self.current_user.id)
@@ -206,6 +212,69 @@ class LeadService:
             lead_id,
             ", ".join(updated_fields) or "（無）",
         )
+        return lead, analysis
+
+    # ------------------------------------------------------------------
+    # AI 跟進建議（Sprint 5）
+    # ------------------------------------------------------------------
+
+    def suggest_follow_up(
+        self, lead_id: int, today: date | None = None
+    ) -> tuple[Lead, AIAnalysis]:
+        """產生一則跟進建議，留下紀錄，但**不改動 lead 的任何欄位**。
+
+        跟 analyze_lead 最大的差別就在這裡：需求解析會把結果寫回客戶資料，
+        建議不會 —— 它是給業務看的參考，不是關於這位客戶的新事實。
+        「下一次什麼時候聯絡」仍然由業務自己決定（見 follow_up.py），
+        AI 給的時機只是一句話，不會偷偷改掉 next_follow_up_at。
+
+        分數、逾期天數都是 Rule Engine 先算好才餵給模型的，
+        不讓它自己判斷這位客戶熱不熱、拖了幾天。
+        """
+        if self.advisor is None:
+            raise AIServiceError("伺服器尚未設定 AI 功能")
+
+        # 用 get_with_interactions 而不是 get_lead：建議的重點就是互動歷史，
+        # 少了它，AI 只能講一些從客戶需求欄位推得出來的空話。
+        lead = self.repo.get_with_interactions(lead_id, self.current_user.id)
+        if lead is None:
+            raise NotFoundError(f"Lead {lead_id} 不存在")
+
+        interactions = list(lead.interactions)
+        if not (lead.raw_requirement or "").strip() and not interactions:
+            # 422 而不是 503：這不是 AI 壞了，是這位客戶身上什麼資料都沒有。
+            # 硬要產生的話，模型只能靠猜 —— 而猜出來的東西正是我們最不想要的。
+            raise ValidationError(
+                "這位客戶還沒有原始需求，也沒有任何互動紀錄，無法產生跟進建議"
+            )
+
+        today = today or date.today()
+        score = calculate_score(lead)
+        status = follow_up.evaluate(lead, interactions, today)
+
+        outcome = self.advisor.suggest(lead, interactions, score, status, today)
+
+        analysis = self.analysis_repo.create(
+            AIAnalysis(
+                lead_id=lead.id,
+                analysis_type=FOLLOW_UP,
+                # 存的是整包 context 而不只是客戶原話。
+                # 建議的品質取決於當時餵了什麼進去，只存原話的話，
+                # 日後看到一則奇怪的建議，會查不出當時模型到底知道多少。
+                input_text=outcome.context,
+                parsed_result=outcome.suggestion.model_dump(mode="json"),
+                suggestion=follow_up_advisor.compose_text(outcome.suggestion),
+                score_snapshot=score.score,
+                level_snapshot=score.level.value,
+                prompt_version=outcome.prompt_version,
+                model=outcome.model,
+                prompt_tokens=outcome.prompt_tokens,
+                completion_tokens=outcome.completion_tokens,
+                latency_ms=outcome.latency_ms,
+            )
+        )
+
+        logger.info("Lead %s 產生跟進建議，分數快照 %s", lead_id, score.score)
         return lead, analysis
 
     @staticmethod

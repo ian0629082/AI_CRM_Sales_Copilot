@@ -13,6 +13,15 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
 
+# analysis_type 的兩個合法值。
+#
+# 定義成常數而不是各處寫字串，是因為它同時被三個地方用到：
+# 寫入時（LeadService）、讀取時的過濾（Lead.latest_analysis）、
+# 以及評估腳本。三個地方各寫一次字串，只要有一個打錯，
+# 症狀會是「徽章莫名其妙消失」這種很難追的問題。
+REQUIREMENT_PARSING = "REQUIREMENT_PARSING"
+FOLLOW_UP = "FOLLOW_UP"
+
 
 class AIAnalysis(Base):
     """每一次 AI 分析的完整紀錄。

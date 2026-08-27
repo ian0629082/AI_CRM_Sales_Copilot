@@ -77,6 +77,77 @@ class ParsedRequirement(BaseModel):
         return self
 
 
+class FollowUpSuggestion(BaseModel):
+    """AI 產生的跟進建議。
+
+    這是專案第一個「AI 生成自由文字」的功能，跟 ParsedRequirement 有根本差異：
+    需求解析有標準答案（客戶說了 2000 萬，答案就是 20000000），
+    跟進建議沒有 —— 同一位客戶有十種合理的跟法。
+
+    所以這裡不追求「答對」，而是把輸出切成三段，讓每一段都能被單獨檢查：
+
+        next_action      下一步動作     業務看得懂、做得到嗎
+        talking_point    建議話術       這是最花時間、最值得自動化的一段
+        suggested_timing 建議時機       跟客戶說過的話對得上嗎
+
+    切成三段而不是一整段自由文字，是為了讓評估有著力點 ——
+    一整段話只能整體給個「好/不好」，切開之後每一段各有各的判準。
+
+    ### evidence 這一欄是整個設計的重點
+
+    要求模型把「話術裡引用到的客戶資訊」逐字摘出來。
+    這一欄不是給業務看的，是給**評估**用的：
+    引用的句子必須逐字出現在輸入裡，這是「有沒有捏造」的可程式驗證版本。
+
+    沒有它的話，「AI 有沒有編造客戶沒說過的事」只能靠人一句一句讀，
+    或再叫另一個 LLM 判斷 —— 前者不可規模化，後者本身也會出錯。
+    """
+
+    next_action: str = Field(
+        min_length=1, max_length=60, description="下一步該做什麼，一句話"
+    )
+    talking_point: str = Field(
+        min_length=1, max_length=300, description="建議的開場話術，可直接複製使用"
+    )
+    suggested_timing: str = Field(
+        min_length=1, max_length=40, description="建議什麼時候聯絡"
+    )
+    evidence: list[str] = Field(
+        default_factory=list,
+        max_length=5,
+        description="話術引用到的客戶資訊，逐字取自客戶原話或互動紀錄",
+    )
+
+
+class FollowUpAnalysisRead(BaseModel):
+    """一次跟進建議的紀錄。
+
+    與 AIAnalysisRead 共用同一張表，但 parsed_result 的型別不同 ——
+    所以分成兩個 schema，而不是把型別放寬成 dict。
+    放寬的代價是前端生成出來的型別會變成 Record<string, never>，等於什麼都拿不到。
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    analysis_type: str
+    # 結構化的三段建議。存的是「當時輸出的快照」，不是拿來查詢的資料。
+    parsed_result: FollowUpSuggestion | None
+    # 組合好的純文字版本。日後 n8n（Sprint 8）要把建議寄到業務信箱時，
+    # 直接取這一欄就好，不必在那邊再拼一次字串。
+    suggestion: str | None
+    # 產生建議當下的分數與等級。
+    # 分數會隨著業務補資料而變動，存快照才知道「這則建議是在幾分的狀態下給的」。
+    score_snapshot: int | None
+    level_snapshot: str | None
+    prompt_version: str
+    model: str
+    prompt_tokens: int | None
+    completion_tokens: int | None
+    latency_ms: int | None
+    created_at: datetime
+
+
 class AIAnalysisRead(BaseModel):
     """一次 AI 分析的紀錄，回給前端用來顯示「AI 解析」徽章與分析時間。"""
 
