@@ -12,6 +12,7 @@ from datetime import date
 import pytest
 
 from evaluation.followup_criteria import (
+    AppointmentKind,
     FollowUpReport,
     Verdict,
     check_actionable,
@@ -20,6 +21,7 @@ from evaluation.followup_criteria import (
     check_timing_matches_appointment,
     check_uses_history,
     check_viewing_confirmed,
+    classify_appointment,
     evaluate_case,
 )
 
@@ -335,6 +337,34 @@ def test_without_a_base_date_it_falls_back_to_literal_matching():
     record = "客戶請我8/30再聯繫"
     assert check_timing_matches_appointment("8/30", record).verdict is Verdict.PASS
     assert check_timing_matches_appointment("後天", record).verdict is Verdict.FAIL
+
+
+def test_only_the_latest_interaction_defines_the_appointment():
+    """幾週前那個早就被取代的約定，不能拿來要求今天的建議。
+
+    這是跑 holdout 時真的踩到的。互動紀錄長這樣（基準日 8/28）：
+
+        8/20 LINE  介紹3間房子給她，客戶說她看一下，請我下周二聯繫她
+        8/28 電話  確認完上次介紹的3間都要看，約好明天下午15:00帶看
+
+    那個「下周二」是相對於 8/20 講的，指的是 8/25，早就過了；
+    而且 8/28 又聯絡過一次，客戶已經確認要看房。
+    明天下午三點要帶看，今天本來就該打電話確認 —— AI 建議「今天」是對的。
+
+    當時最強的證據是**兩條判準互相矛盾**：viewing_confirmed 判 PASS
+    （明天帶看，叫業務今天去確認），timing_matches 判 FAIL（該等下週二）。
+    一條說今天該打、一條說今天不該打，不可能同時成立。
+    """
+    stale = "介紹3間房子給她，客戶說她看一下，請我下周二聯繫她"
+    latest = "確認完上次介紹的3間都要看，約好明天下午15:00帶看"
+
+    # 只看最新那一筆：沒有回電約定，這條判準不適用
+    assert (
+        check_timing_matches_appointment("今天", latest, _TODAY).verdict
+        is Verdict.NOT_APPLICABLE
+    )
+    # 而舊的那一筆單獨看仍然抓得到 —— 問題從來不是抓不到，是不該拿它來判
+    assert classify_appointment(stale)[0] is AppointmentKind.CONTACT
 
 
 def test_promised_answer_counts_as_an_appointment():

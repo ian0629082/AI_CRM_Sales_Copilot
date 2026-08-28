@@ -401,9 +401,30 @@ _TIME_OF_DAY = re.compile(r"上午|下午|早上|中午|傍晚|晚上|下班前"
 
 
 def check_timing_matches_appointment(
-    suggested_timing: str, source_text: str, today: date | None = None
+    suggested_timing: str, appointment_text: str, today: date | None = None
 ) -> CriterionResult:
     """客戶自己約了時間，建議時機就要照他講的。
+
+    ### appointment_text 只能是「最新一筆互動紀錄」，不能是整包歷史
+
+    這條是踩到才發現的。第一版把整包互動紀錄丟進來掃，於是抓到了
+    **早就過期、而且早就被後續接觸取代**的約定：
+
+        8/20 LINE  介紹3間房子給她，客戶說她看一下，請我下周二聯繫她
+        8/28 電話  確認完上次介紹的3間都要看，約好明天下午15:00帶看
+
+    基準日是 8/28。那個「下周二」是相對於 8/20 講的，指的是 8/25 ——
+    早就過了，而且 8/28 又聯絡過一次，客戶已經確認要看房。
+    判準卻仍然要求建議時機是「下週二」，把一則正確的建議判成失敗。
+
+    當時最強的證據是**兩條判準互相矛盾**：
+    viewing_confirmed 判 PASS（明天要帶看，叫業務今天去確認，正確），
+    timing_matches 判 FAIL（該等下週二）。
+    一條說今天就該打，一條說今天不該打，不可能同時成立。
+
+    所以只看最新那一筆：業務每接觸一次就會更新客戶的狀態，
+    先前的約定如果還有效，會在最新那次接觸裡被重述；
+    沒被重述，就是已經被取代了。
 
     這條判準是**業務實務判斷**，不是我想出來的：
     客戶說「叫我下週三下午再打給你」，業務今天下午就打過去，
@@ -419,7 +440,7 @@ def check_timing_matches_appointment(
     只比對「下午」的話，「客戶約下週三下午、業務今天下午打」會被判成通過——
     而那正是這條判準唯一要抓的東西。
     """
-    kind, promised = classify_appointment(source_text)
+    kind, promised = classify_appointment(appointment_text)
 
     if kind is AppointmentKind.NONE:
         return CriterionResult(
@@ -547,6 +568,7 @@ def evaluate_case(
     interaction_text: str,
     viewing_is_tomorrow: bool = False,
     today: date | None = None,
+    latest_interaction: str | None = None,
 ) -> FollowUpCaseResult:
     """對一則建議跑完第一層的四條判準。
 
@@ -566,7 +588,12 @@ def evaluate_case(
             check_actionable(suggestion.get("next_action", "")),
             check_numbers_grounded(suggestion.get("talking_point", ""), source_text),
             check_timing_matches_appointment(
-                suggestion.get("suggested_timing", ""), source_text, today
+                suggestion.get("suggested_timing", ""),
+                # 約定只從最新一筆互動裡找。整包歷史丟進去的話，
+                # 幾週前那個早就被取代的約定會把正確的建議判成失敗。
+                # 沒有互動紀錄時退回客戶原話（剛建檔的新客戶就屬於這種）。
+                latest_interaction if latest_interaction is not None else source_text,
+                today,
             ),
             check_viewing_confirmed(
                 suggestion.get("next_action", ""),

@@ -306,6 +306,10 @@ def run_case(advisor: FollowUpAdvisor, judge_provider, case: dict, today: date):
         viewing_is_tomorrow=status.bucket is follow_up.FollowUpBucket.VIEWING_CONFIRM,
         # 判準要能把「8/30」跟「後天」換算成同一天，所以基準日要傳進去。
         today=today,
+        # 「客戶約了下次聯絡時間」只看最新一筆互動。
+        # interactions 是由新到舊排的（跟正式流程從資料庫撈出來的順序一致），
+        # 所以第一筆就是最新的那一筆。
+        latest_interaction=recent[0].content if recent else "",
     )
 
     if judge_provider is not None:
