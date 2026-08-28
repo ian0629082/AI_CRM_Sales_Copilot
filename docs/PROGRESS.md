@@ -17,7 +17,7 @@
 | 3 | AI Requirement Parsing | ✅ |
 | 4 | AI Evaluation Dataset | ✅ |
 | 5 | Lead Scoring + Follow-up | ✅ 程式全部完成，評估尚未實際跑過（要花錢） |
-| 6 | Quality：Testing / Logging / Error Handling / Security | ⬜ |
+| 6 | Quality：Testing / Logging / Error Handling / Security | 🟡 主要項目完成，兩項節流留到 Sprint 7 |
 | 7 | Deployment：Docker / CI/CD / 上線 | ⬜ **← MVP 完成，可開始投履歷** |
 | 8 | n8n Automation | ⬜ |
 | 9 | RAG Knowledge Base | ⬜ |
@@ -122,6 +122,86 @@ AI 的話術寫「8/29 下午我拿過去給你參考」，那句話來自互動
 所以判斷依據只有一條：**改完之後會不會放過真正的捏造？**
 不會 —— 拿掉的只有最外層引號，內容仍須逐字相符，改寫一個字照樣判失敗。
 中間的引號也不脫：客戶說「他跟我說『再看看』」，那個『再看看』是內容。
+
+### Sprint 6 完成內容
+
+**這個 Sprint 不是從零蓋一套，是補洞。** 開工前先把 backend 掃過一遍，
+發現 `AppError` 體系、各層的 logger、CORS、JWT 密鑰長度驗證都已經在了，
+所以範圍縮成「目前確實缺的那幾塊」：
+
+- **全域兜底的錯誤處理**：未預期的例外一律回 500，對外只說一句話 + 一組追查代碼
+- **`request_id`**：middleware 產生，contextvar 傳遞，每行 log 自動帶上，回應也帶回去
+- **登入失敗的 email 遮罩**（`sa***@example.com`）
+- **CORS 來源改成環境變數** `CORS_ORIGINS`
+- 後端測試 274 個（新增 26 個，全部針對上面這些）
+
+**刻意不做的**：Sentry / ELK / structlog（Render 會自動收 stdout，接了只是多一層要維護的東西）、
+為了覆蓋率數字補測試、audit log（多人團隊或有稽核需求才要的）。
+
+### Sprint 6 的設計決策
+
+**log 的問題不是「有沒有印出來」，是「事後拼不拼得回來」。**
+正式環境沒有終端機。使用者只會說「我剛剛按 AI 解析壞掉了」，
+而 Render 的面板上是幾百行來自不同人、不同請求、交錯在一起的訊息。
+`request_id` 讓那些孤立的句子變回一次完整的請求。
+**而且一定要回寫到回應的 header** —— 只有伺服器自己知道的 id 等於白做。
+
+**用 contextvar 而不是 thread local。**
+FastAPI 同時有 async route（跑在事件迴圈）與 `def` route（丟到 threadpool），
+thread local 在前者會整批共用同一個值。
+
+**用 logging Filter 自動注入，不要求每個呼叫端自己帶。**
+一旦需要「每次都記得寫」，就一定會有地方漏掉，
+而漏掉的那一行往往正是出事時最想看的那一行。
+
+**登入失敗的 log 遮罩 email。**
+這跟「登入失敗訊息刻意一致」防的是同一件事（不要洩漏誰有註冊過），
+但戰場不同：API 回應守住了，log 卻會累積成一份「有人試過的帳號清單」，
+而看得到 log 的人比看得到資料庫的人多得多 ——
+雲端平台的網頁面板、CI 輸出、卡關時貼給別人求助的截圖。
+
+**但不是乾脆不記。** 遮罩後同一個帳號的多次失敗仍然長得一樣，
+「有人針對這個帳號反覆嘗試」照樣看得出來，那正是查問題真正需要的資訊。
+
+**Service 層仍然不知道 HTTP 存在。**
+「登入失敗要記來源 IP」看似逼得 AuthService 得知道什麼是 IP，
+但其實不必：那一行跟 middleware 記的那一行共用同一個 `request_id`，
+而那一行有完整的 IP。這是 `request_id` 的第二個好處。
+
+**兜底的錯誤處理放在自己的 middleware，不是 `@app.exception_handler(Exception)`。**
+這條是實測撞出來的：Starlette 內建的錯誤處理器位在整個中介層堆疊的**最外面**，
+它產生的回應不會經過 CORSMiddleware，所以那個 500 沒有 CORS header ——
+瀏覽器會直接擋掉整包，前端只看得到一個沒有內容的網路錯誤，
+連我們特地放進去的 `request_id` 都讀不到，追查用的那條線就斷了。
+所以兜底要放在 CORS 的**內層**，讓回應照正常路徑往外經過 CORS。
+
+`@app.exception_handler(Exception)` 仍然留著當最後一道防線
+（middleware 自己壞掉時），但正常情況下永遠不會被觸發。
+
+**記 traceback 要用 `exc_info=exc`，不能用 `logger.exception()`。**
+後者靠 `sys.exc_info()` 抓「當下的例外」，
+但同步的錯誤處理器會被丟到 threadpool 執行，換了執行緒之後那個當下是空的 ——
+log 只會留下一句 `NoneType: None`，剛好把最需要的東西弄丟。
+這種錯誤不會讓任何測試變紅，只會在真的出事那天才發現。
+
+**500 對外少說、對內說完。**
+預設的錯誤畫面可能吐出堆疊、檔案路徑、套件版本甚至 SQL，那是攻擊者最想看的東西。
+但同樣的細節必須完整進 log，否則等於沒發生過。
+測試同時驗證兩個方向：敏感字串**不在**回應裡、**在** log 裡。
+
+**500 與 503 不能混用。** 500 是「我們的程式壞了」，
+`AIServiceError` 的 503 是「外部服務暫時不可用，等一下再試」。
+前端要據此決定顯示「請稍後再試」還是「重試」按鈕。
+
+**留到 Sprint 7 才做的兩項節流**（現在做容易做錯）：
+
+| | 為什麼留到部署時 |
+|---|---|
+| 登入次數限制 | 要考慮 Render 的反向代理會蓋掉來源 IP，沒有實際環境時容易做錯 |
+| AI 端點次數限制 | 同上，而且上限的數字要貼近實務使用頻率 |
+
+> 順帶一提，`X-Forwarded-For` 是客戶端可以偽造的，
+> 所以它只能用來看趨勢與輔助查問題，**不能當作封鎖的唯一依據**。
 
 ### 環境現況
 
@@ -621,33 +701,38 @@ cd frontend && npm run gen:api
 
 ## 六、下一步
 
-Sprint 5 的程式全部完成了，分支 `feature/ai-followup`（尚未合併進 develop）。
+Sprint 5 的程式與評估都完成了，`feature/ai-followup` 已合併進 develop，
+`docs/evaluation/` 裡有 follow_up v1～v4 的完整報告。
 
-### 先把兩件收尾的事做完
+### 唯一還沒完成的收尾：把 holdout 補到 15 筆
 
-1. **實際跑一次跟進建議的評估**（會花錢）
+`backend/evaluation/holdout_form.txt` 目前只填了 5 筆，
+所以那個 80% 的信賴區間寬到不能單獨引用（見 Sprint 5 那一節的三點提醒）。
 
-   ```bash
-   cd backend
-   python -m scripts.evaluate_followup --limit 2          # 先確認流程通
-   python -m scripts.evaluate_followup --judge            # 跑整份，含 LLM Judge
-   ```
+補題時要留意兩個缺口，但**照真實比例填，不要為了補缺口硬湊**：
 
-   程式寫好了但一次都沒跑過，所以現在**沒有任何數字**。
-   跑完 `docs/evaluation/` 會多一份報告，那份數字才是可以寫進履歷的。
-   如果通過率不好看，那就是 `follow_up_v2` 的素材——
-   跟 Sprint 4 從 v1 的 Error Analysis 寫出 v2 是同一套流程。
+- **明確回電約定**（「你下週三再打給我」）——現在 5 筆一個都沒有，
+  所以「時機對得上客戶約的時間」這條判準一次都沒被考過。
+- **久沒動的客戶**——建檔一個月、逾期沒跟進、互動紀錄只有一兩筆的那種。
+  現在的 5 筆全是這禮拜有動作的熱客戶。
 
-2. **複核那 12 筆情境資料集**（`backend/evaluation/followup_cases.json`）
+填完在 backend 執行：
 
-   情境是開發者寫的，不是有房仲實務經驗的人寫的。
-   如果裡面有「真實業務不會這樣講話」的地方，量出來的數字就不算數——
-   這跟 Sprint 4 堅持資料集不用 LLM 生成是同一個道理。
+```bash
+python -m scripts.build_holdout                        # 先驗格式，過了才產檔
+python -m scripts.evaluate_followup --dataset holdout  # 會花錢
+```
+
+> **出題的人不能讀 prompt，AI 助理不能讀題目。**
+> 這份資料集全部的價值都來自「規則從來沒有照著這些情境調整過」。
 
 ### 然後進 Sprint 6：Quality
 
-Logging、Error Handling、Security 檢查。測試已經有 197 個，
-但目前集中在 API 與規則層，還沒有系統性的日誌與錯誤處理。
+Logging、Error Handling、Security 檢查。測試已經有 197 個。
+
+要注意的是這三項**都不是從零開始**——
+`AppError` 體系、各層的 logger、CORS、JWT 密鑰長度驗證都已經在了。
+Sprint 6 的工作是補上目前確實缺的那幾塊，不是重寫一套。
 
 ### 還有一件小事
 

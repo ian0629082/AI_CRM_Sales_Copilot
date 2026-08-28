@@ -24,6 +24,16 @@ class Settings(BaseSettings):
 
     DATABASE_URL: str
 
+    # 允許跨來源請求的前端網址，多個用逗號分隔。
+    # 寫成設定值而不是寫死 localhost：Sprint 7 前端上 Vercel 之後網址會變，
+    # 那時若還寫死在程式裡，前端會整片拿到 CORS 錯誤，
+    # 而且那種錯誤在瀏覽器上看起來像「後端掛了」，很難第一時間聯想到這裡。
+    CORS_ORIGINS: str = "http://localhost:3000"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+
     JWT_SECRET: str
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440

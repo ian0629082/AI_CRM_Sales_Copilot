@@ -5,6 +5,7 @@ import logging
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictError, UnauthorizedError
+from app.core.logging import mask_email
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.user import User
 from app.repositories.user_repository import UserRepository
@@ -40,7 +41,14 @@ class AuthService:
         # 帳號不存在與密碼錯誤刻意回傳同一個訊息。
         # 若分開回應，攻擊者就能靠錯誤訊息逐一測出哪些 email 有註冊過。
         if user is None or not verify_password(payload.password, user.password_hash):
-            logger.warning("登入失敗 email=%s", payload.email)
+            # email 遮罩後才進 log。這跟上面那條「訊息刻意一致」防的是同一件事
+            # （不要洩漏誰有註冊過），只是戰場不同：API 回應守得住，
+            # log 卻會累積成一份「有人試過的帳號清單」，而且看得到 log 的人更多。
+            #
+            # 這裡不記來源 IP，不是因為不需要，而是因為不必記在這裡 ——
+            # 這一行跟 middleware 記的那一行共用同一個 request_id，
+            # 那一行有完整的 IP。Service 層因此不必知道 HTTP 的存在。
+            logger.warning("登入失敗 email=%s", mask_email(payload.email))
             raise UnauthorizedError("email 或密碼錯誤")
 
         logger.info("使用者登入成功 user_id=%s", user.id)
