@@ -229,6 +229,66 @@ def test_vague_promise_is_not_applicable():
     )
 
 
+# ------------------------------------------------- 業務自己打的字，不是客戶的原話
+#
+# 這一組是專案作者（具房仲實務經驗）指出來的：
+# 互動紀錄是業務事後轉述，不會出現「你下週三再打給我」那種第一人稱句子。
+# 第一版的規則只認得客戶的口吻，於是這條判準的**分母被壓到接近零** ——
+# holdout 5 筆全部不適用、開發集 14 筆也只有 1 筆適用。
+#
+# 沒有分母的通過率是憑空的，而它看起來有數字，所以比缺數字更危險。
+
+
+@pytest.mark.parametrize(
+    "record",
+    [
+        "客戶請我下週三聯繫",
+        "客戶說下週三再聯絡他",
+        "約下週三回電",
+        "客戶下週三才有空，約好那天再談",
+        "客戶要我下週再找他",
+        "說再等等，下週三我再打",
+    ],
+)
+def test_salesperson_phrasing_counts_as_an_appointment(record: str):
+    """業務轉述的寫法也要認得，否則這條判準等於沒有在跑。"""
+    assert check_timing_matches_appointment("今天下午", record).verdict is Verdict.FAIL
+    assert check_timing_matches_appointment("下週三", record).verdict is Verdict.PASS
+
+
+def test_promised_answer_counts_as_an_appointment():
+    """「客戶說他哪天給我答覆」算約定 —— 這是實務判斷。
+
+    客戶說了哪天給答案，那天業務就該主動打過去，
+    不能真的坐在那邊等他來電。
+    """
+    record = "客戶說他考慮一下，週五前給我答覆"
+    assert check_timing_matches_appointment("今天下午", record).verdict is Verdict.FAIL
+    assert check_timing_matches_appointment("週五", record).verdict is Verdict.PASS
+
+
+@pytest.mark.parametrize(
+    ("record", "why"),
+    [
+        ("已聯繫上，詢問需求後，有適合案件會再與客戶連絡", "有案子才聯絡，不是約時間"),
+        ("約好8/29號要到公司與屋主碰面喬價格", "碰面談價是見面約，不是回電約"),
+        ("傳了三間的資料給他，約好明天下午15:00帶看", "帶看約，前一天本來就該先確認"),
+        ("帶看完後表示比較喜歡三房的，回去評估一下", "根本沒有約下次"),
+        ("打電話追蹤，客戶沒接", "業務自己的動作，不是客戶的約定"),
+    ],
+)
+def test_salesperson_notes_that_are_not_callback_promises(record: str, why: str):
+    """放寬的是「有多少案例被檢查」，不是「什麼樣的建議算通過」。
+
+    這一組守的就是那條界線：擴充說法清單之後，
+    這些原本就不該被檢查的紀錄仍然不會被拉進來誤殺。
+    """
+    assert (
+        check_timing_matches_appointment("今天下午", record).verdict
+        is Verdict.NOT_APPLICABLE
+    ), why
+
+
 # ---------------------------------------------------------------- 彙總
 
 
