@@ -430,7 +430,7 @@
           "leads"
         ],
         "summary": "Analyze Lead",
-        "description": "把客戶原話交給 AI 解析，結果直接寫回這位客戶的需求欄位。\n\n同步等待（約 2～5 秒），前端顯示 loading。\n做成同步是因為 MVP 階段一次只分析一筆，排背景工作要多一個 queue 與輪詢機制，\n複雜度換不到對應的好處；真的要批次分析時再改。\n\n可能的失敗：\n- 404 這位客戶不存在（或不是你的）\n- 422 這位客戶還沒填原始需求\n- 503 AI 暫時不可用 —— 客戶資料本身不受影響，前端顯示重試按鈕",
+        "description": "把客戶原話交給 AI 解析，結果直接寫回這位客戶的需求欄位。\n\n同步等待（約 2～5 秒），前端顯示 loading。\n做成同步是因為 MVP 階段一次只分析一筆，排背景工作要多一個 queue 與輪詢機制，\n複雜度換不到對應的好處；真的要批次分析時再改。\n\n**原話沒變的話不會重新呼叫模型**，直接沿用上一次的結果並把 `reused`\n設成 true。同一段話重算一次結果本來就會一樣，那是純粹的浪費；\n業務改了原話（客戶需求變了）再按，才是真的重新解析。\n\n可能的失敗：\n- 404 這位客戶不存在（或不是你的）\n- 422 這位客戶還沒填原始需求\n- 503 AI 暫時不可用 —— 客戶資料本身不受影響，前端顯示重試按鈕",
         "operationId": "analyze_lead_api_v1_leads__lead_id__analyze_post",
         "security": [
           {
@@ -1126,6 +1126,11 @@
           },
           "analysis": {
             "$ref": "#/components/schemas/AIAnalysisRead"
+          },
+          "reused": {
+            "type": "boolean",
+            "title": "Reused",
+            "default": false
           }
         },
         "type": "object",

@@ -173,8 +173,10 @@ class LeadService:
     # AI 需求解析（Sprint 3）
     # ------------------------------------------------------------------
 
-    def analyze_lead(self, lead_id: int) -> tuple[Lead, AIAnalysis]:
+    def analyze_lead(self, lead_id: int) -> tuple[Lead, AIAnalysis, bool]:
         """把客戶原話丟給 AI 解析，結果寫回 lead 欄位，並留下一筆分析紀錄。
+
+        回傳的第三個值代表「這次有沒有真的呼叫模型」（見下面的原話快照比對）。
 
         流程刻意都放在 Service 層：日後 n8n（Sprint 8）收到表單、
         或 Agent（Sprint 11）要分析客戶時，呼叫的是同一個方法，
@@ -190,6 +192,11 @@ class LeadService:
             # 422 而不是 503：這不是 AI 壞了，是這筆客戶根本沒有原話可以分析。
             # 兩者要分得開，前端才知道該顯示「請先填寫客戶需求」還是「請稍後重試」。
             raise ValidationError("這位客戶還沒有原始需求描述，無法進行 AI 解析")
+
+        cached = self._reusable_analysis(lead_id, raw)
+        if cached is not None:
+            logger.info("Lead %s 原話未變更，沿用上一次的解析結果", lead_id)
+            return lead, cached, True
 
         outcome = self.ai_service.parse_requirement(raw)
         updated_fields = self._apply_requirement(lead, outcome.requirement)
@@ -217,7 +224,32 @@ class LeadService:
             lead_id,
             ", ".join(updated_fields) or "（無）",
         )
-        return lead, analysis
+        return lead, analysis, False
+
+    def _reusable_analysis(self, lead_id: int, raw: str) -> AIAnalysis | None:
+        """同一段原話已經解析過的話，直接沿用，不要再花一次錢。
+
+        比對的是**原話的內容**，不是「按過幾次」。所以：
+
+        - 原話沒變重複按 → 回上次的結果（結果本來就會一樣，重算是純浪費）
+        - 客戶改了需求、業務改了原話 → 真的重新解析（輸入不一樣了，該重跑）
+
+        `input_text` 存的是當時那段原話的快照，這個欄位本來就是為了
+        「事後編輯原話時，紀錄仍然對得上當時的輸出」而存的，正好拿來當比對基準。
+
+        **命中快取時不重新套用欄位到 lead。** 那些欄位早就被那次解析填過了，
+        現在的值是「當時的解析 + 業務後續的手動修正」——
+        再套一次會把業務改對的東西蓋回 AI 原本的錯誤，
+        而他按這顆按鈕並沒有要求系統做這件事。
+
+        比對用完全相等而不是忽略空白：業務多打一個標點就重跑，
+        代價只是多花一次錢；反過來把「其實改過了」誤判成沒變，
+        代價是他改了原話卻發現欄位不動，然後不知道為什麼。
+        """
+        previous = self.analysis_repo.get_latest(lead_id, REQUIREMENT_PARSING)
+        if previous is None or (previous.input_text or "").strip() != raw:
+            return None
+        return previous
 
     # ------------------------------------------------------------------
     # AI 跟進建議（Sprint 5）

@@ -206,6 +206,10 @@ class LeadAnalyzeResponse(BaseModel):
 
     lead: LeadRead
     analysis: AIAnalysisRead
+    # 原話跟上次一模一樣時，直接沿用上次的結果，不再呼叫模型。
+    # 這件事一定要告訴前端：否則業務按了按鈕、畫面毫無變化，
+    # 他會以為壞掉而一直按 —— 而每一次「以為壞掉」都是使用者對功能的信任在流失。
+    reused: bool = False
 
 
 class LeadFollowUpResponse(BaseModel):
