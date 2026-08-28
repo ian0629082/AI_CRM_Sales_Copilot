@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -160,6 +161,7 @@ export default function LeadDetailPage() {
   const analyzeLead = useAnalyzeLead(leadId);
   const suggestFollowUp = useSuggestFollowUp(leadId);
 
+  const [editOpen, setEditOpen] = useState(false);
   const [interactionType, setInteractionType] = useState<InteractionType>("CALL");
   const [interactionContent, setInteractionContent] = useState("");
   const [followUpChoice, setFollowUpChoice] = useState(0);
@@ -207,8 +209,15 @@ export default function LeadDetailPage() {
 
   async function handleAnalyze() {
     try {
-      await analyzeLead.mutateAsync();
-      toast.success("AI 解析完成，需求欄位已更新");
+      const result = await analyzeLead.mutateAsync();
+      // 原話沒變的話後端不會重新呼叫模型，直接沿用上次的結果。
+      // 這件事一定要講出來：否則業務按了按鈕、畫面毫無變化，
+      // 他會以為壞掉而一直按，而每一次「以為壞掉」都是信任在流失。
+      toast.success(
+        result.reused
+          ? "客戶原話沒有變更，沿用上一次的解析結果（沒有再花一次費用）"
+          : "AI 解析完成，需求欄位已更新",
+      );
     } catch {
       // 錯誤已經由 mutation 的 isError 狀態接手，在卡片裡就地顯示並附上重試按鈕。
       // 這裡只是避免 unhandled rejection。
@@ -343,6 +352,9 @@ export default function LeadDetailPage() {
               ))}
             </SelectContent>
           </Select>
+          <Button variant="outline" onClick={() => setEditOpen(true)}>
+            編輯
+          </Button>
           <Button
             variant="destructive"
             onClick={handleDelete}
@@ -932,6 +944,8 @@ export default function LeadDetailPage() {
           </Card>
         </div>
       </div>
+
+      <EditLeadDialog lead={lead} open={editOpen} onOpenChange={setEditOpen} />
     </div>
   );
 }

@@ -1,11 +1,11 @@
 {
   "meta": {
     "version": "v1",
-    "case_count": 5,
+    "case_count": 13,
     "purpose": "跟進建議的 held-out 驗證集",
     "source": "由具房仲業務實務經驗、且未讀過 prompt 的人出題",
     "generated_from": "holdout_form.txt",
-    "form_today": "2026-08-27",
+    "form_today": "2026-08-28",
     "how_to_read": [
       "這份**只用來量測，永遠不拿來調 prompt**。",
       "它的全部價值來自「從沒影響過任何決定」——",
@@ -18,7 +18,36 @@
     {
       "id": "hold-001",
       "tags": [],
-      "days_since_created": 2,
+      "days_since_created": 21,
+      "lead": {
+        "name": "王太太0978578678",
+        "status": "VIEWING",
+        "raw_requirement": "我要找北屯區靠近好事多的公寓，我只要一樓的物件，房間數及屋齡不限，預算1000萬。",
+        "location": "台中市北屯區",
+        "budget_max": 10000000,
+        "property_type": "APARTMENT",
+        "purpose": "SELF_USE"
+      },
+      "interactions": [
+        {
+          "type": "LINE",
+          "days_ago": 8,
+          "content": "介紹3間房子給她，客戶說她看一下，請我下周二聯繫她"
+        },
+        {
+          "type": "CALL",
+          "days_ago": 0,
+          "content": "確認完上次介紹的3間都要看，約好明天下午15:00帶看"
+        }
+      ],
+      "next_follow_up_in_days": 0,
+      "viewing_in_days": 1,
+      "viewing_hour": 15
+    },
+    {
+      "id": "hold-002",
+      "tags": [],
+      "days_since_created": 3,
       "lead": {
         "name": "胡小姐",
         "status": "CONTACTED",
@@ -33,15 +62,15 @@
       "interactions": [
         {
           "type": "CALL",
-          "days_ago": 2,
+          "days_ago": 3,
           "content": "已聯繫上，詢問需求後，有適合案件會再與客戶連絡"
         }
       ]
     },
     {
-      "id": "hold-002",
+      "id": "hold-003",
       "tags": [],
-      "days_since_created": 31,
+      "days_since_created": 32,
       "lead": {
         "name": "陳太太",
         "status": "INTERESTED",
@@ -56,20 +85,20 @@
       "interactions": [
         {
           "type": "LINE",
-          "days_ago": 7,
+          "days_ago": 8,
           "content": "有介紹城市之星社區的8樓的兩房與12樓的三房給她，約好8/24下午14:00帶看"
         },
         {
           "type": "VIEWING",
-          "days_ago": 3,
+          "days_ago": 4,
           "content": "帶看完後表示比較喜歡12樓的三房，回去評估一下"
         }
       ]
     },
     {
-      "id": "hold-003",
+      "id": "hold-004",
       "tags": [],
-      "days_since_created": 17,
+      "days_since_created": 18,
       "lead": {
         "name": "吳先生",
         "status": "VIEWING",
@@ -85,17 +114,17 @@
       "interactions": [
         {
           "type": "LINE",
-          "days_ago": 13,
+          "days_ago": 14,
           "content": "傳了三間西區的大樓給他，他表示有興趣，約好8/28下午15:00帶看"
         }
       ],
-      "viewing_in_days": 1,
+      "viewing_in_days": 0,
       "viewing_hour": 15
     },
     {
-      "id": "hold-004",
+      "id": "hold-005",
       "tags": [],
-      "days_since_created": 26,
+      "days_since_created": 27,
       "lead": {
         "name": "周杰倫",
         "status": "NEGOTIATING",
@@ -111,26 +140,26 @@
       "interactions": [
         {
           "type": "VIEWING",
-          "days_ago": 7,
+          "days_ago": 8,
           "content": "有評估福星路的獨棟電梯別墅，口頭有出3700萬，再回去跟家人討論"
         },
         {
           "type": "CALL",
-          "days_ago": 5,
+          "days_ago": 6,
           "content": "追蹤客戶表示有明確想賣，約隔天碰面收斡旋"
         },
         {
           "type": "MEETING",
-          "days_ago": 4,
+          "days_ago": 5,
           "content": "最後收3750萬的斡旋，約好8/29號要到公司與屋主碰面喬價格"
         }
       ],
-      "next_follow_up_in_days": 1
+      "next_follow_up_in_days": 0
     },
     {
-      "id": "hold-005",
+      "id": "hold-006",
       "tags": [],
-      "days_since_created": 22,
+      "days_since_created": 23,
       "lead": {
         "name": "張老闆",
         "status": "MEETING",
@@ -146,11 +175,206 @@
       "interactions": [
         {
           "type": "CALL",
-          "days_ago": 2,
+          "days_ago": 3,
           "content": "介紹了2間獨棟的電梯套房，張老闆希望我8/29下午拿資料過去給他參考"
         }
       ],
+      "next_follow_up_in_days": 0
+    },
+    {
+      "id": "hold-007",
+      "tags": [],
+      "days_since_created": 22,
+      "lead": {
+        "name": "許先生",
+        "status": "CONTACTED",
+        "phone": "0970258456",
+        "raw_requirement": "我要找北屯區的大樓，權狀25坪，室內20坪，要3房2廳2衛，預算1000萬內，屋齡20年內有車位，要自住。",
+        "location": "台中市北屯區",
+        "budget_max": 10000000,
+        "rooms": 3,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": 20,
+        "parking": true,
+        "purpose": "SELF_USE"
+      },
+      "interactions": [
+        {
+          "type": "CALL",
+          "days_ago": 22,
+          "content": "連繫不上電話沒接"
+        },
+        {
+          "type": "CALL",
+          "days_ago": 21,
+          "content": "有連繫上許先生，詢問需求後，有適合案件會再與客戶連絡"
+        }
+      ],
+      "next_follow_up_in_days": -18
+    },
+    {
+      "id": "hold-008",
+      "tags": [],
+      "days_since_created": 20,
+      "lead": {
+        "name": "張小姐",
+        "status": "INTERESTED",
+        "phone": "0932789456",
+        "raw_requirement": "要找中興大學附近的大樓，三房平車，高樓層要有視野，希望不要有裝潢，預算2000萬，想要再年底前買到房子。",
+        "location": "台中市南區",
+        "budget_max": 20000000,
+        "rooms": 3,
+        "property_type": "ELEVATOR_BUILDING",
+        "parking": true,
+        "purpose": "SELF_USE",
+        "urgency": "HIGH"
+      },
+      "interactions": [
+        {
+          "type": "VIEWING",
+          "days_ago": 3,
+          "content": "帶看了興大奇美三房的15樓，客戶有喜歡，下周一再打給我。"
+        }
+      ],
+      "next_follow_up_in_days": 3
+    },
+    {
+      "id": "hold-009",
+      "tags": [],
+      "days_since_created": 13,
+      "lead": {
+        "name": "謝小姐",
+        "status": "INTERESTED",
+        "phone": "0945678910",
+        "raw_requirement": "找南區國圖館附近，要四房雙車位，屋齡30年內，預算2500萬以內，不要頂樓。",
+        "location": "台中市南區",
+        "budget_max": 25000000,
+        "rooms": 4,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": 30,
+        "parking": true,
+        "purpose": "SELF_USE",
+        "urgency": "HIGH"
+      },
+      "interactions": [
+        {
+          "type": "VIEWING",
+          "days_ago": 5,
+          "content": "惠宇國圖館的高樓四房，全家都很喜歡，需要回去評估看看，約好8/30再跟她聯繫"
+        }
+      ],
+      "next_follow_up_in_days": 2
+    },
+    {
+      "id": "hold-010",
+      "tags": [],
+      "days_since_created": 8,
+      "lead": {
+        "name": "張婉婉",
+        "status": "CONTACTED",
+        "phone": "0987542369",
+        "raw_requirement": "我要找台中市區兩房的大樓，預算1200萬，要有車位，我有養寵物希望附近有公園，現在住的地方租約快到期，希望能快點找到房子。",
+        "location": "台中市區",
+        "budget_max": 12000000,
+        "rooms": 2,
+        "property_type": "ELEVATOR_BUILDING",
+        "parking": true,
+        "purpose": "SELF_USE",
+        "urgency": "HIGH"
+      },
+      "interactions": [
+        {
+          "type": "CALL",
+          "days_ago": 3,
+          "content": "介紹了一間文心苑的兩房，客戶表示有興趣，約好8/22上午10:00帶看。"
+        },
+        {
+          "type": "CALL",
+          "days_ago": 5,
+          "content": "又再介紹了一間同社區的10樓的兩房，約好8/30上午10:00帶看。"
+        }
+      ],
+      "next_follow_up_in_days": 1,
+      "viewing_in_days": 2,
+      "viewing_hour": 10
+    },
+    {
+      "id": "hold-011",
+      "tags": [],
+      "days_since_created": 11,
+      "lead": {
+        "name": "鄭國文",
+        "status": "MEETING",
+        "phone": "0985236947",
+        "raw_requirement": "要找南屯區的別墅，需要是惠文國中學區，預算希望控制在3000萬內，需要雙車位，4房，屋齡15年內。",
+        "location": "台中市南屯區",
+        "budget_max": 30000000,
+        "rooms": 4,
+        "property_type": "VILLA",
+        "building_age_max": 15,
+        "parking": true,
+        "purpose": "SELF_USE"
+      },
+      "interactions": [
+        {
+          "type": "LINE",
+          "days_ago": 8,
+          "content": "傳了3間房子，客戶表示有興趣，約好8/29下午2點碰面"
+        }
+      ],
       "next_follow_up_in_days": 1
+    },
+    {
+      "id": "hold-012",
+      "tags": [],
+      "days_since_created": 12,
+      "lead": {
+        "name": "陳太太",
+        "status": "NEGOTIATING",
+        "phone": "0916847637",
+        "raw_requirement": "我要找南屯區靠近捷運站的電梯大樓，預算有4000萬，希望屋齡新一點的，我有兩部車，樓層越高越好。",
+        "location": "台中市南屯區",
+        "budget_max": 40000000,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": 10,
+        "parking": true,
+        "purpose": "SELF_USE"
+      },
+      "interactions": [
+        {
+          "type": "CALL",
+          "days_ago": 3,
+          "content": "介紹了文心路的案子給她，客戶表示有興趣，請我週日聯繫她，確認後續帶看時間。"
+        }
+      ],
+      "next_follow_up_in_days": 2
+    },
+    {
+      "id": "hold-013",
+      "tags": [],
+      "days_since_created": 13,
+      "lead": {
+        "name": "蔣先生",
+        "status": "VIEWING",
+        "phone": "0988147369",
+        "raw_requirement": "我要找北區大樓，要車位，權狀要25坪以上，室內要有18坪，預算1200萬，屋齡20年內，有長輩要住，所以希望離中國醫不要太遠。",
+        "location": "台中市北區",
+        "budget_max": 12000000,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": 20,
+        "parking": true,
+        "purpose": "SELF_USE"
+      },
+      "interactions": [
+        {
+          "type": "CALL",
+          "days_ago": 13,
+          "content": "聯繫上，了解需求後，約好8/29上午9:30帶看一間適合的房子。"
+        }
+      ],
+      "next_follow_up_in_days": 0,
+      "viewing_in_days": 1,
+      "viewing_hour": 9
     }
   ]
 }

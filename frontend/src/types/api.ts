@@ -144,6 +144,10 @@ export interface paths {
          *     做成同步是因為 MVP 階段一次只分析一筆，排背景工作要多一個 queue 與輪詢機制，
          *     複雜度換不到對應的好處；真的要批次分析時再改。
          *
+         *     **原話沒變的話不會重新呼叫模型**，直接沿用上一次的結果並把 `reused`
+         *     設成 true。同一段話重算一次結果本來就會一樣，那是純粹的浪費；
+         *     業務改了原話（客戶需求變了）再按，才是真的重新解析。
+         *
          *     可能的失敗：
          *     - 404 這位客戶不存在（或不是你的）
          *     - 422 這位客戶還沒填原始需求
@@ -434,6 +438,11 @@ export interface components {
         LeadAnalyzeResponse: {
             lead: components["schemas"]["LeadRead"];
             analysis: components["schemas"]["AIAnalysisRead"];
+            /**
+             * Reused
+             * @default false
+             */
+            reused: boolean;
         };
         /** LeadCreate */
         LeadCreate: {

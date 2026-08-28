@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field as dataclass_field
+from datetime import date, timedelta
 from enum import Enum
 
 # 空話清單。
@@ -214,8 +215,43 @@ def check_numbers_grounded(talking_point: str, source_text: str) -> CriterionRes
 
 
 # 客戶「明確約定下次回電時間」的說法。這幾個詞本身就指向聯絡，不必看上下文。
+#
+# ### 這裡要同時涵蓋兩種文體
+#
+# 第一版只寫了客戶第一人稱的說法（「你下週三再打給我」），
+# 但**互動紀錄不是那樣寫的** —— 那些字是業務自己打的，是轉述：
+#
+#     客戶請我下週三聯繫
+#     約下週三回電
+#     客戶說他考慮一下，週五前給我答覆
+#
+# 這三句原本一句都抓不到。後果不是「這條判準通過率低」，
+# 而是它的**分母被壓到接近零**：holdout 5 筆全部不適用、
+# 開發集 14 筆也只有 1 筆適用。一條沒有分母的判準，
+# 它的通過率是憑空的 —— 而它看起來有數字，所以比缺數字更危險。
+#
+# ### 為什麼是「請我聯繫」而不是「約好碰面」
+#
+# 只收**明確指向通訊行為**的說法。既有的設計已經分過這條線：
+# 客戶約的是看屋時間，業務不必等到那時候才打電話（帶看前一天本來就該先確認）；
+# 只有客戶約的是**回電**時間，建議的時機才必須照做。
+# 同理，「約好 29 號到公司碰面談價」是見面約，不是回電約。
+#
+# 安全網是現成的：抓到說法之後，還必須在附近找到明確的時間詞
+# 才會判定通過或失敗，找不到就回「不適用」。所以這個清單放寬的是
+# **有多少案例被檢查**，不是「什麼樣的建議算通過」。
 _APPOINTMENT = re.compile(
-    r".{0,12}(?:再打給|再聯絡|再回你|再回我|再撥|再找我|再約|再通知|打給我|聯絡我)"
+    r".{0,14}(?:"
+    # 客戶第一人稱，或業務直接轉述客戶的動作
+    r"再打給|再聯絡|再聯繫|再連絡|再回你|再回我|再撥|再找我|再找他|再約|再通知"
+    r"|打給我|聯絡我|聯繫我|再打|再談"
+    # 「約下週三回電」「週五前給我答覆」——業務記互動紀錄時最常見的寫法。
+    # 「答覆」算約定，是專案作者的實務判斷：客戶說了哪天給答案，
+    # 那天業務就該主動打過去，不能真的坐等他來電。
+    r"|回電|答覆|回覆"
+    # 請託式：「客戶請我下週三聯繫」「客戶要我下週再找他」
+    r"|(?:請|叫|要)我.{0,6}(?:打|聯絡|聯繫|連絡|找|通知|回電)"
+    r")"
 )
 
 # 「有空」「方便」要看上下文才知道在講什麼。
@@ -271,12 +307,92 @@ def classify_appointment(source_text: str) -> tuple[AppointmentKind, str]:
 
     return AppointmentKind.NONE, ""
 
+def normalize_day_words(text: str) -> str:
+    """把星期的幾種寫法收斂成同一種。
+
+    業務打字會寫「下周二」，模型可能寫「下週二」，人也可能寫「下星期二」——
+    三種寫的是同一天。不先收斂的話會出兩種錯，而且方向相反：
+
+    - 業務寫「下周二」→ 時間詞抓不到 → 這條判準對那一筆變成「不適用」，
+      分母少一筆，而它其實是該被考的
+    - 業務寫「下周二」、模型答「下週二」→ 字面對不上 → 誤判成失敗，
+      而模型其實完全答對了
+
+    後者更糟：一個會誤報的指標，業務看兩次就不看了。
+
+    「禮拜二」不必轉，_DAY 本來就收；姓周的客戶被轉成「週」也無害，
+    因為時間詞還要求後面接星期幾。
+    """
+    return text.replace("星期", "週").replace("周", "週")
+
+
 # 日期層級的時間詞。這一級才算「約好了哪一天」。
+# 比對前一律先過 normalize_day_words，所以這裡只需要寫「週」這一種寫法。
+#
+# `8/30` 這種日期格式排在最前面：業務記約定時間**主要是寫日期**，
+# 不是寫星期幾 —— 跟客戶約的時間很少是明後天，隔了一段距離之後
+# 「下下週二」誰都算不清楚，寫日期才不會錯。
+# 這是專案作者的實務說明，第一版漏掉了整個主流寫法。
 _DAY = re.compile(
-    r"下下週[一二三四五六日天]|下週[一二三四五六日天]|這週[一二三四五六日天]"
+    r"\d{1,2}/\d{1,2}"
+    r"|下下週[一二三四五六日天]|下週[一二三四五六日天]|這週[一二三四五六日天]"
     r"|禮拜[一二三四五六日天]|週[一二三四五六日天]"
     r"|大後天|後天|明天|下週|下個月|\d{1,2}號"
 )
+
+# 能換算成「哪一天」的說法。刻意不含星期幾 ——
+# 「下週二」到底是哪一天，講的人跟聽的人未必一致，
+# 算錯的話會製造出新的誤判，而這條判準最不能有的就是誤判。
+_RESOLVABLE_DATE = re.compile(r"(\d{1,2})/(\d{1,2})|(\d{1,2})號")
+_RELATIVE_DAYS = {"今天": 0, "今日": 0, "明天": 1, "後天": 2, "大後天": 3}
+
+
+def resolve_dates(text: str, today: date) -> set[date]:
+    """把文字裡明確指向某一天的說法換算成實際日期。
+
+    存在的理由是**擋誤殺**：業務寫「8/30」而模型答「後天」，
+    字面上完全對不上，但講的是同一天。
+    判成失敗的話，那是一則其實正確的建議被記成缺陷 ——
+    而評估報告上的每一個失敗，都會有人拿去改 prompt。
+
+    只換算沒有歧義的說法。跨年時往未來取（約定都在未來，
+    12 月底記的「1/5」是明年的 1 月 5 日，不是十一個月前）。
+    """
+    found: set[date] = set()
+
+    for word, offset in _RELATIVE_DAYS.items():
+        if word in text:
+            found.add(today + timedelta(days=offset))
+
+    for month, day, day_only in _RESOLVABLE_DATE.findall(text):
+        try:
+            if day_only:
+                # 只寫「30 號」：先當本月，已經過了就是下個月
+                candidate = today.replace(day=int(day_only))
+                if candidate < today:
+                    candidate = _add_month(candidate)
+            else:
+                candidate = date(today.year, int(month), int(day))
+                if candidate < today:
+                    candidate = candidate.replace(year=today.year + 1)
+        except ValueError:
+            # 2/30 這種不存在的日期，或月份寫成 13。不猜，直接跳過。
+            continue
+        found.add(candidate)
+
+    return found
+
+
+def _add_month(value: date) -> date:
+    """下個月的同一天。落在不存在的日期時退回該月最後一天。"""
+    year = value.year + (value.month // 12)
+    month = value.month % 12 + 1
+    for day in range(value.day, 0, -1):
+        try:
+            return date(year, month, day)
+        except ValueError:
+            continue
+    raise AssertionError("不可能走到這裡")
 
 # 只有時段沒有日期時才看這一級。
 # 「下午」單獨出現不足以構成約定——「今天下午」也含「下午」，
@@ -285,7 +401,7 @@ _TIME_OF_DAY = re.compile(r"上午|下午|早上|中午|傍晚|晚上|下班前"
 
 
 def check_timing_matches_appointment(
-    suggested_timing: str, source_text: str
+    suggested_timing: str, source_text: str, today: date | None = None
 ) -> CriterionResult:
     """客戶自己約了時間，建議時機就要照他講的。
 
@@ -317,10 +433,27 @@ def check_timing_matches_appointment(
         return CriterionResult(
             "timing_matches", Verdict.NOT_APPLICABLE, "客戶講的是看屋時間，不是回電時間"
         )
+    # 兩邊都先收斂寫法再比對：業務寫「下周二」、模型寫「下週二」是同一天，
+    # 不能因為字不同就判失敗。
+    promised = normalize_day_words(promised)
+    suggested_timing_normalized = normalize_day_words(suggested_timing)
+
     days = _DAY.findall(promised)
     if days:
-        if any(day in suggested_timing for day in days):
+        if any(day in suggested_timing_normalized for day in days):
             return CriterionResult("timing_matches", Verdict.PASS)
+        # 字面對不上時，再看兩邊講的是不是同一天。
+        # 業務寫「8/30」而模型答「後天」，字面完全不同但意思一樣 ——
+        # 判成失敗的話，那是一則其實正確的建議被記成缺陷，
+        # 而報告上的每一個失敗都會有人拿去改 prompt。
+        #
+        # 這一關只可能把失敗變成通過，不可能把通過變成失敗，
+        # 而且只有真的算出**同一天**才會通過 —— 答錯天照樣抓得到。
+        if today is not None:
+            promised_dates = resolve_dates(promised, today)
+            suggested_dates = resolve_dates(suggested_timing_normalized, today)
+            if promised_dates & suggested_dates:
+                return CriterionResult("timing_matches", Verdict.PASS)
         return CriterionResult(
             "timing_matches",
             Verdict.FAIL,
@@ -329,7 +462,7 @@ def check_timing_matches_appointment(
 
     slots = _TIME_OF_DAY.findall(promised)
     if slots:
-        if any(slot in suggested_timing for slot in slots):
+        if any(slot in suggested_timing_normalized for slot in slots):
             return CriterionResult("timing_matches", Verdict.PASS)
         return CriterionResult(
             "timing_matches",
@@ -413,6 +546,7 @@ def evaluate_case(
     source_text: str,
     interaction_text: str,
     viewing_is_tomorrow: bool = False,
+    today: date | None = None,
 ) -> FollowUpCaseResult:
     """對一則建議跑完第一層的四條判準。
 
@@ -432,7 +566,7 @@ def evaluate_case(
             check_actionable(suggestion.get("next_action", "")),
             check_numbers_grounded(suggestion.get("talking_point", ""), source_text),
             check_timing_matches_appointment(
-                suggestion.get("suggested_timing", ""), source_text
+                suggestion.get("suggested_timing", ""), source_text, today
             ),
             check_viewing_confirmed(
                 suggestion.get("next_action", ""),

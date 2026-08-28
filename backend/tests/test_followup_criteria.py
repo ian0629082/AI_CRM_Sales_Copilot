@@ -7,6 +7,8 @@
 這份測試跟 test_evaluation_metrics.py 是同一個理由存在的。
 """
 
+from datetime import date
+
 import pytest
 
 from evaluation.followup_criteria import (
@@ -227,6 +229,145 @@ def test_vague_promise_is_not_applicable():
         check_timing_matches_appointment("這週五", "客戶說有物件再通知我").verdict
         is Verdict.NOT_APPLICABLE
     )
+
+
+# ------------------------------------------------- 業務自己打的字，不是客戶的原話
+#
+# 這一組是專案作者（具房仲實務經驗）指出來的：
+# 互動紀錄是業務事後轉述，不會出現「你下週三再打給我」那種第一人稱句子。
+# 第一版的規則只認得客戶的口吻，於是這條判準的**分母被壓到接近零** ——
+# holdout 5 筆全部不適用、開發集 14 筆也只有 1 筆適用。
+#
+# 沒有分母的通過率是憑空的，而它看起來有數字，所以比缺數字更危險。
+
+
+@pytest.mark.parametrize(
+    "record",
+    [
+        "客戶請我下週三聯繫",
+        "客戶說下週三再聯絡他",
+        "約下週三回電",
+        "客戶下週三才有空，約好那天再談",
+        "客戶要我下週再找他",
+        "說再等等，下週三我再打",
+    ],
+)
+def test_salesperson_phrasing_counts_as_an_appointment(record: str):
+    """業務轉述的寫法也要認得，否則這條判準等於沒有在跑。"""
+    assert check_timing_matches_appointment("今天下午", record).verdict is Verdict.FAIL
+    assert check_timing_matches_appointment("下週三", record).verdict is Verdict.PASS
+
+
+@pytest.mark.parametrize("written", ["下周二", "下週二", "下星期二"])
+@pytest.mark.parametrize("answered", ["下周二", "下週二", "下星期二"])
+def test_week_day_spellings_are_interchangeable(written: str, answered: str):
+    """「下周二」「下週二」「下星期二」是同一天，九種組合都要對得上。
+
+    不收斂寫法的話會出兩種錯，而且方向相反：
+    業務寫「下周二」時間詞抓不到，這筆就從分母裡消失；
+    抓到了但模型答「下週二」，又會因為字面不同被誤判成失敗 ——
+    而模型其實完全答對了。後者更糟，一個會誤報的指標沒有人會看。
+    """
+    record = f"客戶請我{written}再聯繫"
+    assert check_timing_matches_appointment(answered, record).verdict is Verdict.PASS
+
+
+@pytest.mark.parametrize("written", ["下周二", "下星期二"])
+def test_week_day_spellings_still_catch_a_wrong_day(written: str):
+    """收斂寫法不能連「答錯天」都一起放過。"""
+    record = f"客戶請我{written}再聯繫"
+    assert check_timing_matches_appointment("今天下午", record).verdict is Verdict.FAIL
+
+
+# --------------------------------------------------- 業務主要是寫日期，不是寫星期幾
+#
+# 專案作者的實務說明：跟客戶約的時間很少是明後天，隔了一段距離之後
+# 「下下週二」誰都算不清楚，所以互動紀錄上寫的是「8/30」。
+# 第一版的規則漏掉了整個主流寫法。
+
+_TODAY = date(2026, 8, 28)
+
+
+@pytest.mark.parametrize(
+    "answered",
+    [
+        "8/30",  # 模型跟著輸入的寫法回答（實際輸出裡最常見的情形）
+        "30號",  # 同一天的另一種寫法
+        "後天",  # 同一天，但字面上完全不同
+    ],
+)
+def test_explicit_date_matches_any_wording_of_the_same_day(answered: str):
+    """業務寫「8/30」，模型只要講的是同一天就算通過。
+
+    這一層存在的理由是擋誤殺：字面不同不代表答錯 ——
+    而報告上的每一個失敗，都會有人拿去改 prompt。
+    """
+    record = "客戶請我8/30再聯繫"
+    assert (
+        check_timing_matches_appointment(answered, record, _TODAY).verdict is Verdict.PASS
+    )
+
+
+@pytest.mark.parametrize("answered", ["8/31", "下週三", "盡快"])
+def test_explicit_date_still_catches_a_different_day(answered: str):
+    """換算是為了少誤殺，不是為了少判失敗 —— 講的不是同一天照樣抓得到。"""
+    record = "客戶請我8/30再聯繫"
+    assert (
+        check_timing_matches_appointment(answered, record, _TODAY).verdict is Verdict.FAIL
+    )
+
+
+def test_date_across_the_year_boundary_goes_forward():
+    """12/28 記的「1/5」是明年的，不是十一個月前的。約定都在未來。"""
+    record = "客戶請我1/5再聯繫"
+    assert (
+        check_timing_matches_appointment("1/5", record, date(2026, 12, 28)).verdict
+        is Verdict.PASS
+    )
+
+
+def test_without_a_base_date_it_falls_back_to_literal_matching():
+    """沒有基準日就退回字面比對，不亂猜。
+
+    判準是可以單獨拿來重跑舊報告的（改了判準不必再花錢打模型），
+    那種情境下不見得有基準日 —— 這時寧可漏抓，也不要拿錯的日期去算。
+    """
+    record = "客戶請我8/30再聯繫"
+    assert check_timing_matches_appointment("8/30", record).verdict is Verdict.PASS
+    assert check_timing_matches_appointment("後天", record).verdict is Verdict.FAIL
+
+
+def test_promised_answer_counts_as_an_appointment():
+    """「客戶說他哪天給我答覆」算約定 —— 這是實務判斷。
+
+    客戶說了哪天給答案，那天業務就該主動打過去，
+    不能真的坐在那邊等他來電。
+    """
+    record = "客戶說他考慮一下，週五前給我答覆"
+    assert check_timing_matches_appointment("今天下午", record).verdict is Verdict.FAIL
+    assert check_timing_matches_appointment("週五", record).verdict is Verdict.PASS
+
+
+@pytest.mark.parametrize(
+    ("record", "why"),
+    [
+        ("已聯繫上，詢問需求後，有適合案件會再與客戶連絡", "有案子才聯絡，不是約時間"),
+        ("約好8/29號要到公司與屋主碰面喬價格", "碰面談價是見面約，不是回電約"),
+        ("傳了三間的資料給他，約好明天下午15:00帶看", "帶看約，前一天本來就該先確認"),
+        ("帶看完後表示比較喜歡三房的，回去評估一下", "根本沒有約下次"),
+        ("打電話追蹤，客戶沒接", "業務自己的動作，不是客戶的約定"),
+    ],
+)
+def test_salesperson_notes_that_are_not_callback_promises(record: str, why: str):
+    """放寬的是「有多少案例被檢查」，不是「什麼樣的建議算通過」。
+
+    這一組守的就是那條界線：擴充說法清單之後，
+    這些原本就不該被檢查的紀錄仍然不會被拉進來誤殺。
+    """
+    assert (
+        check_timing_matches_appointment("今天下午", record).verdict
+        is Verdict.NOT_APPLICABLE
+    ), why
 
 
 # ---------------------------------------------------------------- 彙總
