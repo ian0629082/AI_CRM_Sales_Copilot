@@ -7,6 +7,8 @@
 這份測試跟 test_evaluation_metrics.py 是同一個理由存在的。
 """
 
+from datetime import date
+
 import pytest
 
 from evaluation.followup_criteria import (
@@ -275,6 +277,64 @@ def test_week_day_spellings_still_catch_a_wrong_day(written: str):
     """收斂寫法不能連「答錯天」都一起放過。"""
     record = f"客戶請我{written}再聯繫"
     assert check_timing_matches_appointment("今天下午", record).verdict is Verdict.FAIL
+
+
+# --------------------------------------------------- 業務主要是寫日期，不是寫星期幾
+#
+# 專案作者的實務說明：跟客戶約的時間很少是明後天，隔了一段距離之後
+# 「下下週二」誰都算不清楚，所以互動紀錄上寫的是「8/30」。
+# 第一版的規則漏掉了整個主流寫法。
+
+_TODAY = date(2026, 8, 28)
+
+
+@pytest.mark.parametrize(
+    "answered",
+    [
+        "8/30",  # 模型跟著輸入的寫法回答（實際輸出裡最常見的情形）
+        "30號",  # 同一天的另一種寫法
+        "後天",  # 同一天，但字面上完全不同
+    ],
+)
+def test_explicit_date_matches_any_wording_of_the_same_day(answered: str):
+    """業務寫「8/30」，模型只要講的是同一天就算通過。
+
+    這一層存在的理由是擋誤殺：字面不同不代表答錯 ——
+    而報告上的每一個失敗，都會有人拿去改 prompt。
+    """
+    record = "客戶請我8/30再聯繫"
+    assert (
+        check_timing_matches_appointment(answered, record, _TODAY).verdict is Verdict.PASS
+    )
+
+
+@pytest.mark.parametrize("answered", ["8/31", "下週三", "盡快"])
+def test_explicit_date_still_catches_a_different_day(answered: str):
+    """換算是為了少誤殺，不是為了少判失敗 —— 講的不是同一天照樣抓得到。"""
+    record = "客戶請我8/30再聯繫"
+    assert (
+        check_timing_matches_appointment(answered, record, _TODAY).verdict is Verdict.FAIL
+    )
+
+
+def test_date_across_the_year_boundary_goes_forward():
+    """12/28 記的「1/5」是明年的，不是十一個月前的。約定都在未來。"""
+    record = "客戶請我1/5再聯繫"
+    assert (
+        check_timing_matches_appointment("1/5", record, date(2026, 12, 28)).verdict
+        is Verdict.PASS
+    )
+
+
+def test_without_a_base_date_it_falls_back_to_literal_matching():
+    """沒有基準日就退回字面比對，不亂猜。
+
+    判準是可以單獨拿來重跑舊報告的（改了判準不必再花錢打模型），
+    那種情境下不見得有基準日 —— 這時寧可漏抓，也不要拿錯的日期去算。
+    """
+    record = "客戶請我8/30再聯繫"
+    assert check_timing_matches_appointment("8/30", record).verdict is Verdict.PASS
+    assert check_timing_matches_appointment("後天", record).verdict is Verdict.FAIL
 
 
 def test_promised_answer_counts_as_an_appointment():

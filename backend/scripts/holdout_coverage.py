@@ -107,7 +107,7 @@ def applicability(case: dict, today) -> dict[str, bool]:
     # 給什麼建議都不影響「適不適用」，只影響「過不過」。
     checks = {
         "uses_history": check_uses_history([], interaction_text),
-        "timing_matches": check_timing_matches_appointment("", source_text),
+        "timing_matches": check_timing_matches_appointment("", source_text, today),
         "viewing_confirmed": check_viewing_confirmed(
             "", "", status.bucket is follow_up.FollowUpBucket.VIEWING_CONFIRM
         ),

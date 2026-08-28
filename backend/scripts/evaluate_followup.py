@@ -304,6 +304,8 @@ def run_case(advisor: FollowUpAdvisor, judge_provider, case: dict, today: date):
         # 判斷寫兩份，遲早會有一份跟正式流程不一致，
         # 然後評估量的就不是使用者真正會看到的行為。
         viewing_is_tomorrow=status.bucket is follow_up.FollowUpBucket.VIEWING_CONFIRM,
+        # 判準要能把「8/30」跟「後天」換算成同一天，所以基準日要傳進去。
+        today=today,
     )
 
     if judge_provider is not None:

@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field as dataclass_field
+from datetime import date, timedelta
 from enum import Enum
 
 # 空話清單。
@@ -327,11 +328,71 @@ def normalize_day_words(text: str) -> str:
 
 # 日期層級的時間詞。這一級才算「約好了哪一天」。
 # 比對前一律先過 normalize_day_words，所以這裡只需要寫「週」這一種寫法。
+#
+# `8/30` 這種日期格式排在最前面：業務記約定時間**主要是寫日期**，
+# 不是寫星期幾 —— 跟客戶約的時間很少是明後天，隔了一段距離之後
+# 「下下週二」誰都算不清楚，寫日期才不會錯。
+# 這是專案作者的實務說明，第一版漏掉了整個主流寫法。
 _DAY = re.compile(
-    r"下下週[一二三四五六日天]|下週[一二三四五六日天]|這週[一二三四五六日天]"
+    r"\d{1,2}/\d{1,2}"
+    r"|下下週[一二三四五六日天]|下週[一二三四五六日天]|這週[一二三四五六日天]"
     r"|禮拜[一二三四五六日天]|週[一二三四五六日天]"
     r"|大後天|後天|明天|下週|下個月|\d{1,2}號"
 )
+
+# 能換算成「哪一天」的說法。刻意不含星期幾 ——
+# 「下週二」到底是哪一天，講的人跟聽的人未必一致，
+# 算錯的話會製造出新的誤判，而這條判準最不能有的就是誤判。
+_RESOLVABLE_DATE = re.compile(r"(\d{1,2})/(\d{1,2})|(\d{1,2})號")
+_RELATIVE_DAYS = {"今天": 0, "今日": 0, "明天": 1, "後天": 2, "大後天": 3}
+
+
+def resolve_dates(text: str, today: date) -> set[date]:
+    """把文字裡明確指向某一天的說法換算成實際日期。
+
+    存在的理由是**擋誤殺**：業務寫「8/30」而模型答「後天」，
+    字面上完全對不上，但講的是同一天。
+    判成失敗的話，那是一則其實正確的建議被記成缺陷 ——
+    而評估報告上的每一個失敗，都會有人拿去改 prompt。
+
+    只換算沒有歧義的說法。跨年時往未來取（約定都在未來，
+    12 月底記的「1/5」是明年的 1 月 5 日，不是十一個月前）。
+    """
+    found: set[date] = set()
+
+    for word, offset in _RELATIVE_DAYS.items():
+        if word in text:
+            found.add(today + timedelta(days=offset))
+
+    for month, day, day_only in _RESOLVABLE_DATE.findall(text):
+        try:
+            if day_only:
+                # 只寫「30 號」：先當本月，已經過了就是下個月
+                candidate = today.replace(day=int(day_only))
+                if candidate < today:
+                    candidate = _add_month(candidate)
+            else:
+                candidate = date(today.year, int(month), int(day))
+                if candidate < today:
+                    candidate = candidate.replace(year=today.year + 1)
+        except ValueError:
+            # 2/30 這種不存在的日期，或月份寫成 13。不猜，直接跳過。
+            continue
+        found.add(candidate)
+
+    return found
+
+
+def _add_month(value: date) -> date:
+    """下個月的同一天。落在不存在的日期時退回該月最後一天。"""
+    year = value.year + (value.month // 12)
+    month = value.month % 12 + 1
+    for day in range(value.day, 0, -1):
+        try:
+            return date(year, month, day)
+        except ValueError:
+            continue
+    raise AssertionError("不可能走到這裡")
 
 # 只有時段沒有日期時才看這一級。
 # 「下午」單獨出現不足以構成約定——「今天下午」也含「下午」，
@@ -340,7 +401,7 @@ _TIME_OF_DAY = re.compile(r"上午|下午|早上|中午|傍晚|晚上|下班前"
 
 
 def check_timing_matches_appointment(
-    suggested_timing: str, source_text: str
+    suggested_timing: str, source_text: str, today: date | None = None
 ) -> CriterionResult:
     """客戶自己約了時間，建議時機就要照他講的。
 
@@ -381,6 +442,18 @@ def check_timing_matches_appointment(
     if days:
         if any(day in suggested_timing_normalized for day in days):
             return CriterionResult("timing_matches", Verdict.PASS)
+        # 字面對不上時，再看兩邊講的是不是同一天。
+        # 業務寫「8/30」而模型答「後天」，字面完全不同但意思一樣 ——
+        # 判成失敗的話，那是一則其實正確的建議被記成缺陷，
+        # 而報告上的每一個失敗都會有人拿去改 prompt。
+        #
+        # 這一關只可能把失敗變成通過，不可能把通過變成失敗，
+        # 而且只有真的算出**同一天**才會通過 —— 答錯天照樣抓得到。
+        if today is not None:
+            promised_dates = resolve_dates(promised, today)
+            suggested_dates = resolve_dates(suggested_timing_normalized, today)
+            if promised_dates & suggested_dates:
+                return CriterionResult("timing_matches", Verdict.PASS)
         return CriterionResult(
             "timing_matches",
             Verdict.FAIL,
@@ -473,6 +546,7 @@ def evaluate_case(
     source_text: str,
     interaction_text: str,
     viewing_is_tomorrow: bool = False,
+    today: date | None = None,
 ) -> FollowUpCaseResult:
     """對一則建議跑完第一層的四條判準。
 
@@ -492,7 +566,7 @@ def evaluate_case(
             check_actionable(suggestion.get("next_action", "")),
             check_numbers_grounded(suggestion.get("talking_point", ""), source_text),
             check_timing_matches_appointment(
-                suggestion.get("suggested_timing", ""), source_text
+                suggestion.get("suggested_timing", ""), source_text, today
             ),
             check_viewing_confirmed(
                 suggestion.get("next_action", ""),
