@@ -256,6 +256,27 @@ def test_salesperson_phrasing_counts_as_an_appointment(record: str):
     assert check_timing_matches_appointment("下週三", record).verdict is Verdict.PASS
 
 
+@pytest.mark.parametrize("written", ["下周二", "下週二", "下星期二"])
+@pytest.mark.parametrize("answered", ["下周二", "下週二", "下星期二"])
+def test_week_day_spellings_are_interchangeable(written: str, answered: str):
+    """「下周二」「下週二」「下星期二」是同一天，九種組合都要對得上。
+
+    不收斂寫法的話會出兩種錯，而且方向相反：
+    業務寫「下周二」時間詞抓不到，這筆就從分母裡消失；
+    抓到了但模型答「下週二」，又會因為字面不同被誤判成失敗 ——
+    而模型其實完全答對了。後者更糟，一個會誤報的指標沒有人會看。
+    """
+    record = f"客戶請我{written}再聯繫"
+    assert check_timing_matches_appointment(answered, record).verdict is Verdict.PASS
+
+
+@pytest.mark.parametrize("written", ["下周二", "下星期二"])
+def test_week_day_spellings_still_catch_a_wrong_day(written: str):
+    """收斂寫法不能連「答錯天」都一起放過。"""
+    record = f"客戶請我{written}再聯繫"
+    assert check_timing_matches_appointment("今天下午", record).verdict is Verdict.FAIL
+
+
 def test_promised_answer_counts_as_an_appointment():
     """「客戶說他哪天給我答覆」算約定 —— 這是實務判斷。
 

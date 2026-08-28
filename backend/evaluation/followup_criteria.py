@@ -306,7 +306,27 @@ def classify_appointment(source_text: str) -> tuple[AppointmentKind, str]:
 
     return AppointmentKind.NONE, ""
 
+def normalize_day_words(text: str) -> str:
+    """把星期的幾種寫法收斂成同一種。
+
+    業務打字會寫「下周二」，模型可能寫「下週二」，人也可能寫「下星期二」——
+    三種寫的是同一天。不先收斂的話會出兩種錯，而且方向相反：
+
+    - 業務寫「下周二」→ 時間詞抓不到 → 這條判準對那一筆變成「不適用」，
+      分母少一筆，而它其實是該被考的
+    - 業務寫「下周二」、模型答「下週二」→ 字面對不上 → 誤判成失敗，
+      而模型其實完全答對了
+
+    後者更糟：一個會誤報的指標，業務看兩次就不看了。
+
+    「禮拜二」不必轉，_DAY 本來就收；姓周的客戶被轉成「週」也無害，
+    因為時間詞還要求後面接星期幾。
+    """
+    return text.replace("星期", "週").replace("周", "週")
+
+
 # 日期層級的時間詞。這一級才算「約好了哪一天」。
+# 比對前一律先過 normalize_day_words，所以這裡只需要寫「週」這一種寫法。
 _DAY = re.compile(
     r"下下週[一二三四五六日天]|下週[一二三四五六日天]|這週[一二三四五六日天]"
     r"|禮拜[一二三四五六日天]|週[一二三四五六日天]"
@@ -352,9 +372,14 @@ def check_timing_matches_appointment(
         return CriterionResult(
             "timing_matches", Verdict.NOT_APPLICABLE, "客戶講的是看屋時間，不是回電時間"
         )
+    # 兩邊都先收斂寫法再比對：業務寫「下周二」、模型寫「下週二」是同一天，
+    # 不能因為字不同就判失敗。
+    promised = normalize_day_words(promised)
+    suggested_timing_normalized = normalize_day_words(suggested_timing)
+
     days = _DAY.findall(promised)
     if days:
-        if any(day in suggested_timing for day in days):
+        if any(day in suggested_timing_normalized for day in days):
             return CriterionResult("timing_matches", Verdict.PASS)
         return CriterionResult(
             "timing_matches",
@@ -364,7 +389,7 @@ def check_timing_matches_appointment(
 
     slots = _TIME_OF_DAY.findall(promised)
     if slots:
-        if any(slot in suggested_timing for slot in slots):
+        if any(slot in suggested_timing_normalized for slot in slots):
             return CriterionResult("timing_matches", Verdict.PASS)
         return CriterionResult(
             "timing_matches",
