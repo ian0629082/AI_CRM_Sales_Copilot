@@ -339,5 +339,23 @@ def test_the_old_days_ago_wording_still_works():
 
 def test_a_future_interaction_date_is_caught():
     """互動紀錄是已經發生的事，日期不能比基準日晚。"""
-    with pytest.raises(FormError, match="比基準日還晚"):
+    with pytest.raises(FormError, match="比基準日"):
         parse_interaction("9/5 電話 明天要打的", ANCHOR)
+
+
+def test_future_interaction_message_mentions_the_stale_anchor():
+    """訊息要先講「基準日可能忘了改」。
+
+    這是實際踩到的：表格放了一天才填完，當天記的互動就落在基準日之後。
+    第一版的訊息只說「還沒發生的帶看請填在已約帶看」，
+    把人導向去改那行互動紀錄 —— 而那一行其實是對的，要改的是最上面那行。
+
+    一個把人導向錯地方的錯誤訊息，比沒有訊息更浪費時間。
+    """
+    with pytest.raises(FormError) as exc:
+        parse_interaction("9/5 電話 今天打的", ANCHOR)
+
+    message = str(exc.value)
+    assert "「今天：」" in message
+    # 基準日要印出來，使用者才知道現在是拿哪一天在比
+    assert f"{ANCHOR.month}/{ANCHOR.day}" in message
