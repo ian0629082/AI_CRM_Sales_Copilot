@@ -22,7 +22,9 @@ from evaluation.followup_criteria import (
     check_uses_history,
     check_viewing_confirmed,
     classify_appointment,
+    estimate_weekday_date,
     evaluate_case,
+    resolve_dates,
 )
 
 SOURCE = "想在七期找三房，我下個月要過去上班所以有點急\n客戶說週末想看那間，預算 2000 萬"
@@ -365,6 +367,67 @@ def test_only_the_latest_interaction_defines_the_appointment():
     )
     # 而舊的那一筆單獨看仍然抓得到 —— 問題從來不是抓不到，是不該拿它來判
     assert classify_appointment(stale)[0] is AppointmentKind.CONTACT
+
+
+# ------------------------------------------------------ 約好的那天已經過了
+#
+# 客戶說下週二聯繫，業務忘了打，拖到現在。那個約定已經沒有意義了 ——
+# 這時該做的是盡快補救，不是繼續等一個過去的日期。
+# 這是專案作者的實務判斷，所以判準不能再要求建議時機對上它。
+
+
+def test_expired_weekday_appointment_is_not_applicable():
+    """8/20 記的「下周二」是 8/25，到 8/28 已經過了。"""
+    result = check_timing_matches_appointment(
+        "今天", "客戶請我下周二聯繫", _TODAY, recorded_days_ago=8
+    )
+    assert result.verdict is Verdict.NOT_APPLICABLE
+    assert "已經過了" in result.detail
+
+
+def test_expired_explicit_date_is_not_applicable():
+    result = check_timing_matches_appointment(
+        "今天", "客戶請我8/25再聯繫", _TODAY, recorded_days_ago=8
+    )
+    assert result.verdict is Verdict.NOT_APPLICABLE
+
+
+@pytest.mark.parametrize(
+    ("record", "wrong", "right"),
+    [
+        ("客戶請我下周二聯繫", "今天", "下周二"),
+        ("客戶請我8/30再聯繫", "今天", "8/30"),
+    ],
+)
+def test_a_future_appointment_is_still_checked(record: str, wrong: str, right: str):
+    """還沒到的約定照樣要檢查 —— 過期這條不能變成全面豁免。"""
+    assert (
+        check_timing_matches_appointment(wrong, record, _TODAY, 0).verdict is Verdict.FAIL
+    )
+    assert (
+        check_timing_matches_appointment(right, record, _TODAY, 0).verdict is Verdict.PASS
+    )
+
+
+def test_weekday_estimate_counts_from_the_day_it_was_said():
+    """「下週二」是相對於**講那句話當天**，不是相對於今天。
+
+    8/20 是週四，那天講的「下週二」是 8/25。
+    用今天當基準的話會算成別的日期，過期判斷就整個歪掉。
+    """
+    assert estimate_weekday_date("下週二", date(2026, 8, 20)) == date(2026, 8, 25)
+    assert estimate_weekday_date("這週五", date(2026, 8, 20)) == date(2026, 8, 21)
+    assert estimate_weekday_date("下下週一", date(2026, 8, 20)) == date(2026, 8, 31)
+
+
+def test_explicit_date_is_resolved_against_the_day_it_was_said():
+    """8/20 記的「8/25」是五天後，不是明年的 8/25。
+
+    這是連帶修掉的 bug：拿今天（8/28）去換算一個已經過去的日期時，
+    程式會假設講的是下一次，於是跳到 2027 年 —— 差了整整一年，
+    而且不會有任何錯誤訊息。
+    """
+    assert resolve_dates("8/25", date(2026, 8, 20)) == {date(2026, 8, 25)}
 
 
 def test_promised_answer_counts_as_an_appointment():

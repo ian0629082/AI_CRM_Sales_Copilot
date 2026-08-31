@@ -106,13 +106,16 @@ def applicability(case: dict, today) -> dict[str, bool]:
     # （整包歷史丟進去的話，早就被取代的舊約定會被當成還有效）。
     # 沒有互動紀錄時退回客戶原話。
     latest_interaction = recent[0].content if recent else source_text
+    recorded_days_ago = (today - recent[0].created_at.date()).days if recent else None
 
     # 直接呼叫真正的判準函式，看它回不回 N/A。
     # 傳空字串當作模型的輸出：這幾條的 N/A 判斷只看輸入，
     # 給什麼建議都不影響「適不適用」，只影響「過不過」。
     checks = {
         "uses_history": check_uses_history([], interaction_text),
-        "timing_matches": check_timing_matches_appointment("", latest_interaction, today),
+        "timing_matches": check_timing_matches_appointment(
+            "", latest_interaction, today, recorded_days_ago
+        ),
         "viewing_confirmed": check_viewing_confirmed(
             "", "", status.bucket is follow_up.FollowUpBucket.VIEWING_CONFIRM
         ),

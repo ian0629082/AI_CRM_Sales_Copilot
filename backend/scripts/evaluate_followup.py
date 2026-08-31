@@ -310,6 +310,10 @@ def run_case(advisor: FollowUpAdvisor, judge_provider, case: dict, today: date):
         # interactions 是由新到舊排的（跟正式流程從資料庫撈出來的順序一致），
         # 所以第一筆就是最新的那一筆。
         latest_interaction=recent[0].content if recent else "",
+        # 約定是講在那一天的，換算與「過期了沒」都要用那天當基準。
+        latest_interaction_days_ago=(
+            (today - recent[0].created_at.date()).days if recent else None
+        ),
     )
 
     if judge_provider is not None:

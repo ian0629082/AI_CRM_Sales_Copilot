@@ -323,7 +323,7 @@ def normalize_day_words(text: str) -> str:
     「禮拜二」不必轉，_DAY 本來就收；姓周的客戶被轉成「週」也無害，
     因為時間詞還要求後面接星期幾。
     """
-    return text.replace("星期", "週").replace("周", "週")
+    return text.replace("星期", "週").replace("禮拜", "週").replace("周", "週")
 
 
 # 日期層級的時間詞。這一級才算「約好了哪一天」。
@@ -400,8 +400,83 @@ def _add_month(value: date) -> date:
 _TIME_OF_DAY = re.compile(r"上午|下午|早上|中午|傍晚|晚上|下班前")
 
 
+# 星期幾的說法最遠指到多少天之後。
+# 「下下週日」大約就是這個距離，再遠沒有人會用星期講。
+# 用來判斷一個沒有明確日期的約定是不是一定已經過了。
+MAX_WEEKDAY_REACH_DAYS = 14
+
+
+_WEEKDAY_INDEX = {"一": 0, "二": 1, "三": 2, "四": 3, "五": 4, "六": 5, "日": 6, "天": 6}
+_WEEKDAY_PHRASE = re.compile(r"(下下|下|這)?週([一二三四五六日天])")
+
+
+def estimate_weekday_date(promised: str, said_on: date) -> date | None:
+    """把「下週二」換算成實際日期，用**講那句話當天**當基準。
+
+    這個換算只拿來判斷「約的那天過了沒」，不拿來判斷建議對不對 ——
+    因為「下週二」到底指哪一天，講的人跟聽的人未必完全一致。
+    算錯的後果因此是**少檢查一筆**（回不適用），不是誤判一則正確的建議失敗。
+    這個方向可以接受，反過來就不行。
+
+    以「週一為一週之始」計算：講在 8/20（週四）的「下週二」是 8/25。
+    沒有前綴的「週二」當成最近的那個未來週二。
+    """
+    match = _WEEKDAY_PHRASE.search(promised)
+    if match is None:
+        return None
+
+    prefix, name = match.groups()
+    this_monday = said_on - timedelta(days=said_on.weekday())
+    target = this_monday + timedelta(days=_WEEKDAY_INDEX[name])
+
+    if prefix == "下":
+        return target + timedelta(days=7)
+    if prefix == "下下":
+        return target + timedelta(days=14)
+    if prefix == "這":
+        return target
+    # 沒有前綴：講的是最近的那一個，已經過了就是下週的
+    return target if target >= said_on else target + timedelta(days=7)
+
+
+def _appointment_has_passed(
+    promised: str, today: date, said_on: date | None, recorded_days_ago: int | None
+) -> bool:
+    """客戶約的那一天是不是已經過了。
+
+    分兩種說法處理，因為能掌握的精確度不同：
+
+    - **明確日期**（「8/25」「25 號」）可以直接換算，比一比就知道。
+    - **星期幾**（「下週二」）換算不了 —— 那句話到底指哪一天，
+      講的人跟聽的人未必一致，硬算會製造新的誤判。
+      所以改用一個保守的界線：連最遠的說法都指不到今天，那就一定過了。
+
+    保守的方向是「不確定就當作還沒過」，維持原本的檢查 ——
+    這條判準寧可漏抓，也不要放過真正的錯誤。
+    """
+    if said_on is None:
+        return False
+
+    explicit = resolve_dates(promised, said_on)
+    if explicit:
+        return max(explicit) < today
+
+    weekday = estimate_weekday_date(promised, said_on)
+    if weekday is not None:
+        return weekday < today
+
+    # 連星期幾都抓不到（「下週」「下個月」這種）。
+    # 只能用一個保守的界線：連最遠的說法都指不到今天，那就一定過了。
+    if recorded_days_ago is None:
+        return False
+    return recorded_days_ago > MAX_WEEKDAY_REACH_DAYS
+
+
 def check_timing_matches_appointment(
-    suggested_timing: str, appointment_text: str, today: date | None = None
+    suggested_timing: str,
+    appointment_text: str,
+    today: date | None = None,
+    recorded_days_ago: int | None = None,
 ) -> CriterionResult:
     """客戶自己約了時間，建議時機就要照他講的。
 
@@ -459,6 +534,21 @@ def check_timing_matches_appointment(
     promised = normalize_day_words(promised)
     suggested_timing_normalized = normalize_day_words(suggested_timing)
 
+    # 約定是**講那句話當天**講的，換算基準要用那一天，不能用今天。
+    # 8/20 記的「8/25 再聯繫」，拿今天（8/28）去換算會變成明年的 8/25 ——
+    # 因為程式看到一個已經過去的日期，會假設講的是下一次。
+    said_on = today - timedelta(days=recorded_days_ago) if (
+        today is not None and recorded_days_ago is not None
+    ) else today
+
+    if today is not None and _appointment_has_passed(promised, today, said_on, recorded_days_ago):
+        # 客戶約的那天已經過了（業務沒打，拖到現在）。
+        # 這時候該做的是盡快補救，不是繼續等一個過去的日期 ——
+        # 所以不能再要求建議時機對上它。這是專案作者的實務判斷。
+        return CriterionResult(
+            "timing_matches", Verdict.NOT_APPLICABLE, "客戶約的時間已經過了"
+        )
+
     days = _DAY.findall(promised)
     if days:
         if any(day in suggested_timing_normalized for day in days):
@@ -471,7 +561,9 @@ def check_timing_matches_appointment(
         # 這一關只可能把失敗變成通過，不可能把通過變成失敗，
         # 而且只有真的算出**同一天**才會通過 —— 答錯天照樣抓得到。
         if today is not None:
-            promised_dates = resolve_dates(promised, today)
+            # 約定用「講那句話當天」換算，建議時機用「今天」——
+            # 兩句話是在不同的日子講的，基準日當然也不一樣。
+            promised_dates = resolve_dates(promised, said_on)
             suggested_dates = resolve_dates(suggested_timing_normalized, today)
             if promised_dates & suggested_dates:
                 return CriterionResult("timing_matches", Verdict.PASS)
@@ -569,6 +661,7 @@ def evaluate_case(
     viewing_is_tomorrow: bool = False,
     today: date | None = None,
     latest_interaction: str | None = None,
+    latest_interaction_days_ago: int | None = None,
 ) -> FollowUpCaseResult:
     """對一則建議跑完第一層的四條判準。
 
@@ -594,6 +687,7 @@ def evaluate_case(
                 # 沒有互動紀錄時退回客戶原話（剛建檔的新客戶就屬於這種）。
                 latest_interaction if latest_interaction is not None else source_text,
                 today,
+                latest_interaction_days_ago,
             ),
             check_viewing_confirmed(
                 suggestion.get("next_action", ""),
