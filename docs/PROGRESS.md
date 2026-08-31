@@ -75,7 +75,7 @@
 - **Criteria-based 評估**：三層判準 + 12 筆情境資料集
 - 後端測試 197 個
 
-**評估結果**（`follow_up_v4`，13 筆 holdout，完整報告見 [docs/evaluation/README.md](evaluation/README.md) 第七節）
+**評估結果**（`follow_up_v4`，13 筆 holdout，完整報告見 [docs/evaluation/README.md](evaluation/README.md) 的〈跟進建議〉）
 
 | 判準 | 通過率 |
 |---|---|
