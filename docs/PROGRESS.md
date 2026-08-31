@@ -18,7 +18,7 @@
 | 4 | AI Evaluation Dataset | ✅ |
 | 5 | Lead Scoring + Follow-up | ✅ 程式全部完成，評估尚未實際跑過（要花錢） |
 | 6 | Quality：Testing / Logging / Error Handling / Security | 🟡 主要項目完成，兩項節流留到 Sprint 7 |
-| 7 | Deployment：Docker / CI/CD / 上線 | ⬜ **← MVP 完成，可開始投履歷** |
+| 7 | Deployment：CI/CD / 上線 | ⬜ **← MVP 完成，可開始投履歷** |
 | 8 | n8n Automation | ⬜ |
 | 9 | RAG Knowledge Base | ⬜ |
 | 10 | AI Copilot | ⬜ |
@@ -374,7 +374,7 @@ log 只會留下一句 `NoneType: None`，剛好把最需要的東西弄丟。
 | OpenAI API Key | 已填入 `backend/.env` |
 | LLM 型號 | `gpt-5.4-mini`（環境變數 `OPENAI_MODEL`，換型號不必改程式碼） |
 | Prompt 版本 | `lead_analysis_v4`（v1～v3 全部保留在程式碼中，供評估比較用） |
-| Docker | 尚未安裝（Sprint 7 才需要） |
+| Docker | **決定不用**（Render 直接跑 Python，理由見下方 Sprint 7） |
 | Demo 帳號 | `demo@example.com` / `demo1234`，Neon 上有測試資料 |
 
 ---
@@ -752,8 +752,25 @@ Unit Test（Scoring 規則、驗證邏輯）、API Test、Logging、Error Handli
 
 ### Sprint 7：Deployment ← MVP 完成
 
-Docker + docker-compose、GitHub Actions CI、前端上 Vercel、後端上 Render/Railway。
+GitHub Actions CI、前端上 Vercel、後端上 Render。
 Demo 要能「Try Demo」一鍵進入，預先建立 30～50 筆虛構客戶。
+
+**Docker 決定不做。** 規劃書原本寫 Dockerfile + docker-compose，
+實際評估之後拿掉了 —— 這個專案的每一個預設用途都不成立：
+Render 支援直接跑 Python、資料庫在 Neon 雲端（本機不需要 Postgres 容器）、
+單人開發沒有環境一致性問題、CI 用 `setup-python` 更快。
+
+剩下唯一的理由是求職訊號，而它換不到這個代價：
+
+- **第一次部署時未知數要越少越好。** 用 Docker 部署失敗時，
+  分不清是 Dockerfile 寫錯、環境變數沒設對、還是程式本身的問題。
+- **沒在用的 Dockerfile 會腐爛。** 改了依賴之後它會悄悄壞掉，
+  面試官真的 `docker build` 而失敗，比沒有 Dockerfile 更糟 ——
+  那證明的是「放了一個自己沒在用的東西」。
+
+> 知道 Docker 在什麼情況下**才真的必要**（多人協作、需要本機起依賴服務、
+> 部署目標不提供 runtime），比在不需要的地方放一個更能說明判斷力。
+> 這件事本身就是面試可以講的內容。
 
 **到這裡第一版正式完成，可以開始投履歷。**
 

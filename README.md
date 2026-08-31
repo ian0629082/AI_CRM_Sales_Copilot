@@ -15,10 +15,10 @@ AI 驅動的房仲業務 CRM 助手：把客戶的自然語言需求轉成結構
 | 1 | CRM Core：Authentication（JWT + bcrypt）與資料隔離 | ✅ |
 | 2 | Vertical Slice：Next.js 前端（登入、客戶列表、新增、詳細頁） | ✅ |
 | 3 | AI Requirement Parsing | ⬜ |
-| 4 | AI Evaluation Dataset | ⬜ |
-| 5 | Lead Scoring + Follow-up | ⬜ |
-| 6 | Testing / Logging / Security | ⬜ |
-| 7 | Docker / CI/CD / Deployment | ⬜ |
+| 4 | AI Evaluation Dataset | ✅ |
+| 5 | Lead Scoring + Follow-up | ✅ |
+| 6 | Testing / Logging / Security | ✅ |
+| 7 | CI/CD / Deployment | ⬜ |
 
 詳細進度、已定案的設計決策與後續各 Sprint 規劃，見 [docs/PROGRESS.md](docs/PROGRESS.md)。
 
