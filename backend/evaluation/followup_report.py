@@ -23,6 +23,30 @@ def _pct(value: float | None) -> str:
     return "—" if value is None else f"{value * 100:.1f}%"
 
 
+# 哪幾條判準的失敗需要人去看一眼，以及要看什麼。
+#
+# 這是**呈現**，不是判定 —— 判定維持失敗，通過率一個小數點都不動。
+# 存在的理由是這兩條用的都是代理指標：它們檢查的是一個可程式驗證的替身
+# （evidence 欄位、數字字串），不是真正要問的那件事。
+# 替身會有誤差，而誤差的方向是可預測的，所以與其把它藏起來，
+# 不如直接告訴讀報告的人「這一筆要自己看」。
+#
+# 為什麼不乾脆改判準讓它別誤判：那需要語意比對，也就是再叫一個 LLM 來判 ——
+# 第一層就會從「確定性、最可信」降級成「會出錯」，
+# 而整套評估的可信度都靠第一層撐著。
+NEEDS_HUMAN_REVIEW = {
+    "uses_history": (
+        "⚠️ 這條看的是 `evidence` 欄位，不是話術本身。"
+        "模型可能真的用了互動紀錄，只是沒把它摘進 evidence（名額被客戶原話佔滿）。"
+        "**請看一眼話術**：若確實用到了，這是代理指標的限制，不是模型的缺陷。"
+    ),
+    "numbers_grounded": (
+        "⚠️ 這條是啟發式的，會誤判（例如模型寫「3 天內」而客戶沒講過 3）。"
+        "**請看一眼**那個數字是不是關於客戶的事實。"
+    ),
+}
+
+
 DATASET_CAVEAT = {
     "dev": (
         "⚠️ 這是**開發集**。Prompt 的規則是看著它的失敗案例補出來的，"
@@ -122,6 +146,8 @@ def render_followup_markdown(
             add("")
             for result in case.failures:
                 add(f"- **{CRITERIA_LABELS.get(result.name, result.name)}**：{result.detail}")
+                if result.name in NEEDS_HUMAN_REVIEW:
+                    add(f"  - {NEEDS_HUMAN_REVIEW[result.name]}")
             add("")
             add("```")
             add(f"下一步：{case.suggestion.get('next_action', '')}")
