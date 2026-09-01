@@ -86,5 +86,5 @@ jobs:
         env:
           # client.ts 在模組載入時就會檢查這個變數，沒有的話 build 直接失敗。
           # 建置階段只需要它存在且格式正確，不會真的連線。
-          NEXT_PUBLIC_API_BASE_URL: "http://localhost:8000"
+          NEXT_PUBLIC_API_BASE_URL: "http://127.0.0.1:8000/api/v1"
         run: npm run build
