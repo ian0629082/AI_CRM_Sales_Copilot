@@ -1,6 +1,6 @@
 # 開發進度與後續規劃
 
-> 最後更新：2026-08-27
+> 最後更新：2026-09-01
 >
 > 這份文件記錄「做到哪裡」與「為什麼這樣做」。
 > 操作指令請看 [README.md](../README.md)，完整構想請看 [開發規劃書](../AI_CRM_Sales_Copilot_開發規劃.md)。
@@ -16,7 +16,7 @@
 | 2 | Vertical Slice：Next.js 前端，前端到資料庫全鏈路跑通 | ✅ |
 | 3 | AI Requirement Parsing | ✅ |
 | 4 | AI Evaluation Dataset | ✅ |
-| 5 | Lead Scoring + Follow-up | ✅ 程式全部完成，評估尚未實際跑過（要花錢） |
+| 5 | Lead Scoring + Follow-up | ✅ 程式與評估都完成（holdout 13 筆已跑過） |
 | 6 | Quality：Testing / Logging / Error Handling / Security | 🟡 主要項目完成，兩項節流留到 Sprint 7 |
 | 7 | Deployment：CI/CD / 上線 | ⬜ **← MVP 完成，可開始投履歷** |
 | 8 | n8n Automation | ⬜ |
@@ -876,42 +876,50 @@ cd frontend && npm run gen:api
 
 ---
 
-## 六、下一步
+## 六、下一步：Sprint 7 Deployment
 
-Sprint 5 的程式與評估都完成了，`feature/ai-followup` 已合併進 develop，
-`docs/evaluation/` 裡有 follow_up v1～v4 的完整報告。
+Sprint 0～6 的程式都完成了，已合併進 `develop` 並推送。後端測試 **323 個**。
+Sprint 6 標成 🟡 是因為兩項節流刻意留到這裡做（見下方第三點），不是漏掉。
+做完 Sprint 7 就是 MVP，可以開始投履歷。
 
-### 唯一還沒完成的收尾：把 holdout 補到 15 筆
+### 要做的四件事
 
-`backend/evaluation/holdout_form.txt` 目前只填了 5 筆，
-所以那個 80% 的信賴區間寬到不能單獨引用（見 Sprint 5 那一節的三點提醒）。
+**一、GitHub Actions CI。**
+跑後端測試就好，**不需要 `OPENAI_API_KEY`** ——
+所有測試都用假的 `LLMProvider`，兩支測試專門守著
+「沒設 key 的環境仍要能跑完整個 CRM，只是那顆按鈕回 503」。
+這是把 `LLMProvider` 那層刻意做薄的回報：CI 不必碰祕密、不會花錢、不會因模型隨機性而時紅時綠。
 
-補題時要留意兩個缺口，但**照真實比例填，不要為了補缺口硬湊**：
+**二、前端上 Vercel、後端上 Render。**
+`CORS_ORIGINS` 已經是環境變數，部署時填 Vercel 的網域即可。
 
-- **明確回電約定**（「你下週三再打給我」）——現在 5 筆一個都沒有，
-  所以「時機對得上客戶約的時間」這條判準一次都沒被考過。
-- **久沒動的客戶**——建檔一個月、逾期沒跟進、互動紀錄只有一兩筆的那種。
-  現在的 5 筆全是這禮拜有動作的熱客戶。
+**三、還掉 Sprint 6 欠的兩項節流。**
+留到現在做，是因為它們都要看 Render 的實際環境（反向代理會蓋掉來源 IP）：
 
-填完在 backend 執行：
+| 項目 | 上限 |
+|---|---|
+| 登入次數限制 | 待定，要先確認 Render 怎麼傳真實 IP |
+| 跟進建議次數限制 | **每人每天 10 次**（依實務給的數字：一天真正讓業務猶豫「要打嗎、講什麼」的客戶大約就這麼多） |
 
-```bash
-python -m scripts.build_holdout                        # 先驗格式，過了才產檔
-python -m scripts.evaluate_followup --dataset holdout  # 會花錢
-```
+> `X-Forwarded-For` 是客戶端可以偽造的，只能看趨勢與輔助查問題，
+> **不能當作封鎖的唯一依據**。
 
-> **出題的人不能讀 prompt，AI 助理不能讀題目。**
-> 這份資料集全部的價值都來自「規則從來沒有照著這些情境調整過」。
+**四、前端顯示 `request_id`。**
+Sprint 6 已經讓每個回應都帶回 `request_id`，但畫面上還沒有出口 ——
+使用者說不出那組代碼的話，這條追查線只做了一半。
 
-### 然後進 Sprint 6：Quality
+### 部署時已知的兩個坑
 
-Logging、Error Handling、Security 檢查。測試已經有 197 個。
+- **Render 免費方案沒人用 15 分鐘就休眠**，第一個請求要等 30～50 秒。
+  面試官點開作品可能以為壞掉了 —— 要用載入中提示，或排程定期喚醒。
+- **Demo 要能一鍵進入**，預先建立 30～50 筆虛構客戶（`scripts/seed_demo.py` 已經有 20 筆的版本）。
 
-要注意的是這三項**都不是從零開始**——
-`AppError` 體系、各層的 logger、CORS、JWT 密鑰長度驗證都已經在了。
-Sprint 6 的工作是補上目前確實缺的那幾塊，不是重寫一套。
+**Docker 決定不做**，理由寫在第四節的 Sprint 7 那一段。
 
-### 還有一件小事
+### 上線前才做的最後一件事
 
 期末考資料集（`backend/evaluation/final_test.json`）仍然鎖著，
-Sprint 7 上線前才第一次執行。跑它需要多打一個確認旗標。
+**Sprint 7 上線前才第一次執行**，跑它需要多打一個確認旗標。
+
+它跟 holdout 的差別是「出題者未讀過 prompt」——
+這條紀律寫在 [evaluation/README.md](evaluation/README.md) 的〈出題與作答要隔離〉。
