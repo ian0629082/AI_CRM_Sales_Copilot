@@ -17,6 +17,19 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        # 驗證失敗時不要把讀到的值印出來。
+        #
+        # 這條是部署時實際踩到的：Render 上少設了 DATABASE_URL，
+        # pydantic 的錯誤訊息就把「目前已經讀到的設定」整個 dict 附在後面，
+        # 於是 JWT_SECRET 的值被印進 build log。
+        #
+        # 也就是說，少設一個環境變數的懲罰不是「啟動失敗」而已，
+        # 是「其餘所有祕密一起曝光」—— 而看得到 build log 的人
+        # 比看得到資料庫的人多得多（雲端平台的網頁面板、CI 輸出、
+        # 卡關時貼給別人求助的截圖）。
+        #
+        # 關掉之後訊息仍然會講清楚是哪個欄位缺了，查問題需要的資訊一點沒少。
+        hide_input_in_errors=True,
     )
 
     PROJECT_NAME: str = "AI CRM Sales Copilot"
