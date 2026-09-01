@@ -55,16 +55,40 @@
 
 ## 二、前端上 Vercel
 
-1. Vercel → New Project，選同一個 repo，**Root Directory 設成 `frontend`**。
-2. 環境變數只有一個：
+Import 的時候找不到設定欄位是正常的，Vercel 把它們都放在專案建好之後的
+**Settings** 裡。三件事要**一次設完再重新部署**，不要改一項部署一次：
 
-   ```
-   NEXT_PUBLIC_API_BASE_URL = https://<你的服務>.onrender.com/api/v1
-   ```
+| 位置 | 設定 |
+|---|---|
+| Settings → **Build and Deployment** → Root Directory | `frontend` |
+| Settings → **Environments** → Production → Branch Tracking | 目前的部署分支 |
+| Settings → **Environments** → Production → Environment Variables | `NEXT_PUBLIC_API_BASE_URL` = `https://<你的服務>.onrender.com/api/v1` |
 
-   **結尾的 `/api/v1` 不能漏**，本機 `.env.local` 也是這個格式。
+**結尾的 `/api/v1` 不能漏**，本機 `.env.local` 也是這個格式。
+漏了的話每支 API 都會 404，症狀看起來像後端掛了。
 
-3. 部署完成後先不要急著登入，見下一步。
+### 這一段有三個地方會卡
+
+**一、`NEXT_PUBLIC_API_BASE_URL` 的 Type 要選 `Config`，不要選 `Secret`。**
+`NEXT_PUBLIC_` 開頭的變數會被編譯進瀏覽器看得到的程式碼，它本來就是公開的。
+選 Secret 除了自己再也看不到值，更糟的是把一個公開值標成祕密 ——
+下次讀設定的人會分不清哪些才是真的要保護的東西。
+
+**二、設完環境變數一定要重新部署。**
+`NEXT_PUBLIC_*` 是**建置時**寫進程式碼的，不是執行時讀的。
+只存檔不重建，畫面上不會有任何變化。
+
+**三、改了 Branch Tracking 之後，要推一個新 commit 才會生效。**
+改設定不會自己觸發部署，而對著舊的失敗紀錄按 Redeploy，
+重跑的仍然是**那一次的 commit**（也就是舊分支的內容）。
+
+> 這一條特別容易誤判，因為 `main` 上的程式碼通常**建得起來**，
+> 只是少了還沒合併進去的功能 —— 你會拿到一個看起來正常、
+> 功能卻少一半的網站，而且沒有任何錯誤訊息提醒你。
+
+網域還沒有任何一次成功部署時，開起來會是 Vercel 的 404，
+回應標頭寫著 `X-Vercel-Error: DEPLOYMENT_NOT_FOUND` ——
+看到這個就是「設定可能都對了，但還沒真的建成功過」，不是程式的問題。
 
 ---
 
@@ -98,3 +122,18 @@ Render → Environment → `CORS_ORIGINS` 改成 `https://<你的專案>.vercel.
 
 任何一項失敗，先看 Render 的 Logs，用畫面上顯示的 `request_id` 去搜——
 那組代碼就是為了這種時候存在的。
+
+---
+
+## 五、合併回 main 之後一定要做的事
+
+部署期間 Render 與 Vercel 都綁在 `feature/deployment` 上。
+全部驗完、合併進 `develop` 再進 `main` 之後，**兩邊都要改回 `main`**：
+
+| 平台 | 位置 |
+|---|---|
+| Render | Settings → Branch |
+| Vercel | Settings → Environments → Production → Branch Tracking |
+
+不改的話正式站會永遠跟著一個 feature 分支跑 —— 而那個分支之後不會再更新，
+於是「已經合併進 main 的修正沒有上線」，卻看不出任何異常。
