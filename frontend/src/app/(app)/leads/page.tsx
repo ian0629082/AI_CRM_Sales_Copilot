@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import { StarterDataNotice } from "@/components/leads/starter-data-notice";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,6 +65,8 @@ export default function LeadsPage() {
           新增客戶
         </Button>
       </div>
+
+      <StarterDataNotice />
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <Input
