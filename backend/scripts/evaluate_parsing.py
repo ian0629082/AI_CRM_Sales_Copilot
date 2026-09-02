@@ -34,6 +34,7 @@ from app.core.config import settings
 from app.core.exceptions import AIServiceError
 from app.services.ai_service import DEFAULT_PROMPT_VERSION, PROMPTS, AIService
 from app.services.llm_provider import OpenAIProvider
+from evaluation.console import force_utf8_output
 from evaluation.metrics import CaseResult, build_report, compare_case
 from evaluation.report import render_markdown
 
@@ -136,6 +137,7 @@ def run_case(service: AIService, case: dict) -> tuple[CaseResult | None, tuple[s
 
 
 def main() -> int:
+    force_utf8_output()
     args = parse_args()
 
     if not settings.OPENAI_API_KEY:

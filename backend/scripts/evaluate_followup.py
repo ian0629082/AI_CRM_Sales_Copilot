@@ -63,6 +63,7 @@ from app.services.follow_up_advisor import (
 )
 from app.services.llm_provider import LLMError, OpenAIProvider
 from app.services.scoring_service import calculate_score
+from evaluation.console import force_utf8_output
 from evaluation.followup_criteria import FollowUpReport, evaluate_case
 from evaluation.followup_report import render_followup_markdown
 
@@ -349,6 +350,9 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    # 同一個坑：Windows 終端機預設 cp950，印到編不出來的字元會讓整支腳本
+    # 掛在 print 那一行。理由詳見 evaluation/console.py。
+    force_utf8_output()
     args = parse_args()
 
     if not settings.OPENAI_API_KEY:
