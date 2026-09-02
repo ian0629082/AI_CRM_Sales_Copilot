@@ -60,7 +60,16 @@ def anon_client(db_session: Session) -> Generator[TestClient, None, None]:
 
 
 def _register_and_login(c: TestClient, name: str, email: str) -> str:
-    """建立帳號並回傳 access token。"""
+    """建立帳號並回傳 access token。
+
+    註冊會自動帶進幾筆範例客戶（見 app/services/starter_data.py），
+    這裡把它們刪掉，讓每個測試都從一張白紙開始。
+
+    為什麼不乾脆在測試環境關掉那個功能：那樣「註冊會建立範例資料」
+    這件事在測試裡就完全不存在了，改壞了也沒人知道。
+    現在的做法是照正式流程跑完、再清空 ——
+    範例資料本身由 test_starter_data.py 專門驗證。
+    """
     resp = c.post(
         f"{PREFIX}/auth/register",
         json={"name": name, "email": email, "password": "password123"},
@@ -72,7 +81,18 @@ def _register_and_login(c: TestClient, name: str, email: str) -> str:
         json={"email": email, "password": "password123"},
     )
     assert resp.status_code == 200, resp.text
-    return resp.json()["access_token"]
+    token = resp.json()["access_token"]
+
+    # 清掉註冊時自動建立的範例客戶
+    listed = c.get(f"{PREFIX}/leads", headers={"Authorization": f"Bearer {token}"})
+    assert listed.status_code == 200, listed.text
+    for lead in listed.json()["items"]:
+        c.delete(
+            f"{PREFIX}/leads/{lead['id']}",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+    return token
 
 
 @pytest.fixture

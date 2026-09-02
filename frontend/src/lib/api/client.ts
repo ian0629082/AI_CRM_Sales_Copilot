@@ -18,11 +18,43 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /**
+     * 後端這次請求的追查代碼（回應的 x-request-id）。
+     *
+     * 只有伺服器自己知道的 id 等於白做 —— 使用者說「我剛剛按下去壞了」，
+     * 而 Render 的面板上是幾百行來自不同人、交錯在一起的訊息。
+     * 把這組代碼顯示出來，那些孤立的句子才能被接回同一次請求。
+     */
+    public requestId?: string,
   ) {
     super(message);
     this.name = "ApiError";
   }
 }
+
+/**
+ * 「請求變慢了」的通知。
+ *
+ * 這裡不直接呼叫 toast：api client 不應該知道 UI 用什麼套件顯示訊息。
+ * 由 Providers 在啟動時註冊，測試或其他環境可以不註冊。
+ */
+type SlowRequestHandler = (phase: "start" | "end") => void;
+
+let slowRequestHandler: SlowRequestHandler | null = null;
+
+export function setSlowRequestHandler(handler: SlowRequestHandler | null) {
+  slowRequestHandler = handler;
+}
+
+/**
+ * 幾秒之後才算「慢」。
+ *
+ * 抓 8 秒是因為兩件事都要顧到：後端就算是醒著的，登入本身也要 3 秒
+ * （bcrypt 故意算得慢，那是它的安全價值），所以門檻太低會對正常請求
+ * 也跳提示；而 Render 免費方案休眠後的喚醒是 50 秒以上，
+ * 使用者在那之前只看得到一顆不動的按鈕。
+ */
+const SLOW_REQUEST_MS = 8000;
 
 /**
  * 從後端的錯誤回應中取出可讀的訊息。
@@ -64,14 +96,33 @@ export async function apiRequest<T>(
 ): Promise<T> {
   const token = getToken();
 
-  const response = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers: {
-      ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+  // 超過門檻才通知，而且只在真的通知過的時候才收回 ——
+  // 否則每一個正常的請求都會讓畫面閃一下。
+  let notified = false;
+  const slowTimer = setTimeout(() => {
+    notified = true;
+    slowRequestHandler?.("start");
+  }, SLOW_REQUEST_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers: {
+        ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    });
+  } finally {
+    // 用 finally：請求失敗時也要收掉提示，
+    // 不然一個斷線的請求會在畫面上留下一句「正在喚醒」永遠不消失。
+    clearTimeout(slowTimer);
+    if (notified) slowRequestHandler?.("end");
+  }
+
+  // 後端每個回應都帶這個 header（CORS 那邊也特地 expose 了它）。
+  const requestId = response.headers.get("x-request-id") ?? undefined;
 
   if (response.status === 401 && clearTokenOn401) {
     // token 過期或無效，清掉以免後續每一支 API 都拿它去撞牆
@@ -87,7 +138,11 @@ export async function apiRequest<T>(
   const data = text ? JSON.parse(text) : null;
 
   if (!response.ok) {
-    throw new ApiError(response.status, extractErrorMessage(data, response.status));
+    throw new ApiError(
+      response.status,
+      extractErrorMessage(data, response.status),
+      requestId,
+    );
   }
 
   return data as T;

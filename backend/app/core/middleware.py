@@ -21,20 +21,32 @@ REQUEST_ID_HEADER = "X-Request-ID"
 UNEXPECTED_ERROR_MESSAGE = "伺服器發生非預期的錯誤，請稍後再試"
 
 
-def client_ip_of(request: Request) -> str:
-    """取得來源 IP。
+def forwarded_chain(request: Request) -> list[str]:
+    """X-Forwarded-For 拆成一串，最左邊是最早的那一段。"""
+    raw = request.headers.get("X-Forwarded-For", "")
+    return [part.strip() for part in raw.split(",") if part.strip()]
 
-    正式環境的請求會先經過 Render 的反向代理，
-    `request.client.host` 拿到的是代理伺服器的 IP，每個人都一樣 ——
-    那樣的 IP 對「同一個來源反覆嘗試登入」這種判斷完全沒有用。
-    真正的來源在 X-Forwarded-For 的第一段。
 
-    這個 header 是客戶端可以偽造的，所以它只能用來看趨勢、輔助查問題，
-    **不能拿來當作授權或封鎖的唯一依據**。
+def claimed_client_ip(request: Request) -> str:
+    """客戶端**宣稱**的來源 IP（X-Forwarded-For 的第一段）。
+
+    名字裡的 claimed 是刻意的：這個值是送請求的人自己填的。
+    在 Render 上實測過 —— 偽造 `X-Forwarded-For: 1.2.3.4` 之後，
+    log 裡就是 1.2.3.4，平台不會覆蓋它。
+
+    所以它只能拿來查問題與看趨勢，**不能當作封鎖或計數的依據**。
+
+    那「往後數」呢？也不行。同一次實測顯示最後一段是 Render 的內部位址
+    （10.x），而且兩次請求拿到不同的機器 —— 內部有多台代理輪替。
+    拿它當鍵的話，同一個來源每次拿到不同的鍵，計數永遠累積不到上限；
+    真要用得往回數固定的層數，而那個層數是平台的內部結構決定的，
+    它改一次架構就失效，失效的樣子還是「防護還在，只是不擋任何東西」。
+
+    正式環境沒有這個 header 時（本機開發、直連）退回 TCP 的對端位址。
     """
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    chain = forwarded_chain(request)
+    if chain:
+        return chain[0]
     return request.client.host if request.client else "-"
 
 
@@ -93,7 +105,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         incoming = request.headers.get(REQUEST_ID_HEADER, "")
         request_id = incoming[:64] if incoming else new_request_id()
 
-        set_request_context(request_id, client_ip_of(request))
+        set_request_context(request_id, claimed_client_ip(request))
         request.state.request_id = request_id
 
         started = time.perf_counter()
@@ -112,12 +124,21 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
 
         elapsed_ms = (time.perf_counter() - started) * 1000
         response.headers[REQUEST_ID_HEADER] = request_id
+
+        # 欄位名寫 ip_claimed 而不是 ip：提醒讀 log 的人這個值是對方自己填的。
+        #
+        # hops 是 X-Forwarded-For 有幾段。實測 Render 固定附加 3 段，
+        # 所以正常請求是 3；看到 4 就代表對方自己也塞了一段進來 ——
+        # 那不一定是攻擊（有些代理本來就會加），但它是「這個 ip 更不可信」
+        # 的訊號，而只看 ip 那一欄是看不出來的。
+        hops = len(forwarded_chain(request))
         logger.info(
-            "%s %s → %s (%.0f ms) ip=%s",
+            "%s %s → %s (%.0f ms) ip_claimed=%s hops=%s",
             request.method,
             request.url.path,
             response.status_code,
             elapsed_ms,
-            client_ip_of(request),
+            claimed_client_ip(request),
+            hops,
         )
         return response

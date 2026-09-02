@@ -17,7 +17,11 @@ from app.core.logging import (
     new_request_id,
     set_request_context,
 )
-from app.core.middleware import REQUEST_ID_HEADER, client_ip_of
+from app.core.middleware import (
+    REQUEST_ID_HEADER,
+    claimed_client_ip,
+    forwarded_chain,
+)
 from app.main import app
 from tests.conftest import PREFIX
 
@@ -180,18 +184,40 @@ def _request_with(headers: dict[str, str], client: tuple[str, int] | None):
     return Request(scope)
 
 
-def test_client_ip_prefers_forwarded_header():
-    """正式環境隔著反向代理，request.client 會是代理伺服器，對查問題沒有用。"""
-    req = _request_with({"X-Forwarded-For": "203.0.113.9, 10.0.0.1"}, ("10.0.0.1", 80))
-    assert client_ip_of(req) == "203.0.113.9"
+def test_claimed_ip_is_what_the_caller_wrote():
+    """第一段是「客戶端宣稱的」，查問題時有用，但不能拿來計數。
+
+    實測過 Render：偽造 X-Forwarded-For: 1.2.3.4 之後，log 裡就是 1.2.3.4，
+    平台不會覆蓋它。
+    """
+    req = _request_with({"X-Forwarded-For": "1.2.3.4, 61.223.40.235"}, ("10.0.0.1", 80))
+    assert claimed_client_ip(req) == "1.2.3.4"
 
 
 def test_client_ip_falls_back_to_direct_connection():
-    assert client_ip_of(_request_with({}, ("127.0.0.1", 5000))) == "127.0.0.1"
+    """本機開發或直連時沒有這個 header，退回 TCP 對端位址。"""
+    assert claimed_client_ip(_request_with({}, ("127.0.0.1", 5000))) == "127.0.0.1"
 
 
 def test_client_ip_handles_missing_client():
-    assert client_ip_of(_request_with({}, None)) == "-"
+    assert claimed_client_ip(_request_with({}, None)) == "-"
+
+
+def test_forwarded_chain_counts_hops():
+    """hops 讓「對方自己也塞了一段」看得出來。
+
+    實測 Render 固定附加 3 段，所以正常請求是 3、看到 4 就是對方自己加的。
+    那不一定是攻擊，但它是「這個 ip 更不可信」的訊號，
+    而只看 ip 那一欄完全看不出來。
+    """
+    assert forwarded_chain(_request_with({"X-Forwarded-For": "1.1.1.1"}, None)) == [
+        "1.1.1.1"
+    ]
+    assert forwarded_chain(_request_with({}, None)) == []
+    # 空白與多餘的逗號不該算成一段
+    assert forwarded_chain(
+        _request_with({"X-Forwarded-For": " 1.1.1.1 , , 2.2.2.2 "}, None)
+    ) == ["1.1.1.1", "2.2.2.2"]
 
 
 # ----------------------------------------------------------------------

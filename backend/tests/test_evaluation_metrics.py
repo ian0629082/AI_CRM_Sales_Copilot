@@ -301,12 +301,17 @@ def test_demo_data_does_not_reuse_evaluation_sentences():
 
     Demo 資料可以「參考」測試句子的風格，但不能重用句子本身。
     """
+    from app.services.starter_data import STARTER_LEADS
     from scripts.seed_demo import LEADS
 
-    demo = {spec["raw"] for spec in LEADS}
+    # 兩邊都要守：demo 帳號那 32 筆，以及註冊時自動建立的範例客戶。
+    # 兩份資料分開寫（目的不同），但這條紀律是同一條。
+    written = {spec["raw"] for spec in LEADS} | {
+        spec["raw"] for spec in STARTER_LEADS
+    }
     for name in DATASET_FILES:
-        overlap = demo & {c["raw_requirement"] for c in _load(name)["cases"]}
-        assert overlap == set(), f"Demo 資料與 {name} 重複：{overlap}"
+        overlap = written & {c["raw_requirement"] for c in _load(name)["cases"]}
+        assert overlap == set(), f"Demo／範例資料與 {name} 重複：{overlap}"
 
 
 def test_no_sentence_appears_in_two_datasets():

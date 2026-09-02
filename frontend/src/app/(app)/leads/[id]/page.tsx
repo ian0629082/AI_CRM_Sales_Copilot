@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
+import { RequestIdHint } from "@/components/request-id-hint";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -483,41 +484,56 @@ export default function LeadDetailPage() {
                   <Button size="sm" variant="outline" onClick={handleSuggestFollowUp}>
                     重試
                   </Button>
+                  <RequestIdHint error={suggestFollowUp.error} />
                 </div>
               ) : null}
 
               {advice?.parsed_result ? (
                 <div className="space-y-3">
                   <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">下一步動作</p>
-                    <p className="text-sm font-medium">
+                    <p className="text-xs font-semibold text-foreground/75">
+                      下一步動作
+                    </p>
+                    {/* 這是整張卡片裡業務唯一非讀不可的一句，
+                        所以字級與粗細都比其他段落重一級。 */}
+                    <p className="text-base font-semibold">
                       {advice.parsed_result.next_action}
                     </p>
                   </div>
 
                   <div className="space-y-1">
                     <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs text-muted-foreground">建議話術</p>
+                      <p className="text-xs font-semibold text-foreground/75">
+                        建議話術
+                      </p>
                       <button
                         type="button"
                         onClick={() =>
                           handleCopyTalkingPoint(advice.parsed_result!.talking_point)
                         }
-                        className="text-xs text-muted-foreground hover:underline"
+                        className="text-xs font-medium text-foreground/70 hover:underline"
                       >
                         複製
                       </button>
                     </div>
-                    {/* 話術是這個功能真正省下時間的那一段，所以給它自己的底色，
-                        而且要能一鍵複製 —— 業務下一個動作就是貼到 LINE 上。 */}
-                    <p className="rounded-md bg-muted p-3 text-sm whitespace-pre-wrap">
+                    {/* 話術是這個功能真正省下時間的那一段，而且要能一鍵複製 ——
+                        業務下一個動作就是貼到 LINE 上。
+
+                        分界不靠底色：這套色票裡 --muted（0.97）跟 --card（1.0）
+                        只差 3% 亮度，在白色卡片上等於沒有底色，dark 模式同樣
+                        （0.269 vs 0.205）。加深底色會讓灰階設計變髒，
+                        所以改用左側色條 + 邊框來畫界線 —— primary 在兩個主題
+                        分別是近黑與近白，都跟卡片形成高對比。 */}
+                    <p className="rounded-md border border-l-4 border-border border-l-primary bg-muted p-3 text-sm leading-relaxed whitespace-pre-wrap">
                       {advice.parsed_result.talking_point}
                     </p>
                   </div>
 
                   <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground">建議時機</p>
-                    <p className="text-sm">{advice.parsed_result.suggested_timing}</p>
+                    <p className="text-xs font-semibold text-foreground/75">建議時機</p>
+                    <p className="text-sm font-medium">
+                      {advice.parsed_result.suggested_timing}
+                    </p>
                   </div>
 
                   {advice.parsed_result.evidence.length > 0 ? (
@@ -597,6 +613,7 @@ export default function LeadDetailPage() {
                   <Button size="sm" variant="outline" onClick={handleAnalyze}>
                     重試
                   </Button>
+                  <RequestIdHint error={analyzeLead.error} />
                 </div>
               ) : null}
 
