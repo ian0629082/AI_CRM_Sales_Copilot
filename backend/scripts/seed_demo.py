@@ -196,7 +196,7 @@ LEADS: list[dict] = [
         follow_up=0,
     ),
     dict(
-        name="邱雅琴", phone="0912345020", source=LeadSource.LINE,
+        name="邱雅琴", phone="0912345003", source=LeadSource.LINE,
         status=LeadStatus.VIEWING, created_days_ago=16,
         raw="北屯三房，預算2000萬以內，屋齡10年內，先生開車要平面車位",
         fields=dict(location="北屯", budget_max=20000000, rooms=3,
@@ -301,6 +301,133 @@ LEADS: list[dict] = [
             (InteractionType.CALL, "電訪", 35),
             (InteractionType.VIEWING, "帶看一間，客戶嫌貴", 30),
             (InteractionType.NOTE, "客戶表示先觀望", 22),
+        ],
+        follow_up=None,
+    ),
+
+    # ---------- 補充的密度（Sprint 7）----------
+    #
+    # 這一段刻意不打散進上面的分組，因為它們的目的跟上面那 20 筆不同：
+    # 上面每一筆都是為了讓某個功能在畫面上看得到（明天帶看、靜音、
+    # 逾期未跟進、成交率的分子分母）；這 12 筆是為了讓**列表本身**
+    # 像真的在用的系統 —— 一頁滑得完的客戶名單，搜尋跟篩選按下去
+    # 也看不出差別，那兩個功能等於沒有被展示到。
+    #
+    # 所以這些的狀態與分數刻意分散，而且大多是「沒什麼特別」的客戶。
+    # 真實的 CRM 裡本來就是這種人佔多數。
+    dict(
+        name="謝孟儒", phone="0912345021", source=LeadSource.WEB_FORM,
+        status=LeadStatus.NEW, created_days_ago=1,
+        raw="想在文心路附近找兩房，預算1300萬，我自己一個人住，不用太大",
+        fields=dict(location="文心路", budget_max=13000000, rooms=2,
+                    purpose=Purpose.SELF_USE),
+        interactions=[], follow_up=None,
+    ),
+    dict(
+        name="鄭曉萱", phone="0912345022", source=LeadSource.LINE,
+        status=LeadStatus.NEW, created_days_ago=4,
+        raw="line問的，說想了解一下市區的房子大概多少錢，還沒有很具體",
+        fields=dict(),
+        interactions=[], follow_up=None,
+    ),
+    dict(
+        name="劉冠廷", phone="0912345023", source=LeadSource.REFERRAL,
+        status=LeadStatus.CONTACTED, created_days_ago=14,
+        raw="爸媽要幫他買房，四房或三房加書房都可以，預算3500萬，希望屋齡10年內",
+        fields=dict(rooms=3, budget_max=35000000, building_age_max=10,
+                    purpose=Purpose.SELF_USE),
+        interactions=[(InteractionType.CALL, "跟客戶本人通過話，說要再跟爸媽討論", 6)],
+        follow_up=3,
+    ),
+    dict(
+        name="洪詩涵", phone="0912345024", source=LeadSource.WALK_IN,
+        status=LeadStatus.CONTACTED, created_days_ago=20,
+        raw="路過進來問的，想換屋但舊家還沒賣，說賣掉再看，預算大概2000萬",
+        fields=dict(budget_max=20000000, budget_is_approximate=True,
+                    purpose=Purpose.SELF_USE, urgency=Urgency.LOW),
+        interactions=[(InteractionType.NOTE, "舊家還在賣，短期內不會有動作", 15)],
+        follow_up="muted",
+    ),
+    dict(
+        name="曾柏翰", phone="0912345025", source=LeadSource.PHONE,
+        status=LeadStatus.INTERESTED, created_days_ago=18,
+        raw="想買來收租，兩房電梯就好，1000萬以內，重點是要好租",
+        fields=dict(budget_max=10000000, rooms=2,
+                    property_type=PropertyType.ELEVATOR_BUILDING,
+                    purpose=Purpose.INVESTMENT),
+        interactions=[
+            (InteractionType.CALL, "介紹了兩間，客戶對其中一間有興趣", 8),
+            (InteractionType.LINE, "傳了租金行情給他參考", 5),
+        ],
+        follow_up=2,
+    ),
+    dict(
+        name="許雅婷", phone="0912345026", source=LeadSource.WEB_FORM,
+        status=LeadStatus.INTERESTED, created_days_ago=11,
+        raw="想找有庭院的透天，預算4000萬，家裡有養狗所以要有空間跑",
+        fields=dict(budget_max=40000000, property_type=PropertyType.TOWNHOUSE,
+                    purpose=Purpose.SELF_USE),
+        interactions=[(InteractionType.CALL, "討論了幾個區域，客戶偏好安靜一點的", 4)],
+        follow_up=1,
+    ),
+    dict(
+        name="邱志豪", phone="0912345027", source=LeadSource.REFERRAL,
+        status=LeadStatus.VIEWING, created_days_ago=30,
+        raw="三房自住，預算2800萬，希望有車位，小孩明年要上國中",
+        fields=dict(budget_max=28000000, rooms=3, parking=True,
+                    purpose=Purpose.SELF_USE),
+        interactions=[
+            (InteractionType.VIEWING, "帶看兩間，客戶覺得格局都可以但價格要再談", 9),
+            (InteractionType.CALL, "客戶問還有沒有其他選擇", 3),
+        ],
+        follow_up=0,
+    ),
+    dict(
+        name="馮筱婷", phone="0912345028", source=LeadSource.LINE,
+        status=LeadStatus.VIEWING, created_days_ago=26,
+        raw="夫妻兩個人看，想要三房，預算2400萬左右，先生說要有兩個車位",
+        fields=dict(budget_max=24000000, budget_is_approximate=True, rooms=3,
+                    parking=True, purpose=Purpose.SELF_USE),
+        interactions=[
+            (InteractionType.VIEWING, "帶看一間，太太滿意先生覺得車位太窄", 7),
+            (InteractionType.NOTE, "在找有兩個平面車位的物件", 6),
+        ],
+        follow_up=2,
+    ),
+    dict(
+        name="潘威廷", phone="0912345029", source=LeadSource.WALK_IN,
+        status=LeadStatus.NEGOTIATING, created_days_ago=38,
+        raw="看中一間華廈，開價2600萬，客戶想談到2450萬",
+        fields=dict(budget_max=26000000, property_type=PropertyType.LOW_RISE,
+                    purpose=Purpose.SELF_USE, urgency=Urgency.HIGH),
+        interactions=[
+            (InteractionType.VIEWING, "第二次複看，客戶帶家人一起", 12),
+            (InteractionType.NOTE, "已出斡旋，等屋主回覆", 2),
+        ],
+        follow_up=1,
+    ),
+    dict(
+        name="石家瑜", phone="0912345030", source=LeadSource.PHONE,
+        status=LeadStatus.WON, created_days_ago=70,
+        raw="第一次買房，兩房就好，預算1600萬，希望離捷運近",
+        fields=dict(budget_max=16000000, rooms=2, purpose=Purpose.SELF_USE),
+        interactions=[
+            (InteractionType.VIEWING, "帶看三間", 45),
+            (InteractionType.NOTE, "簽約完成", 20),
+        ],
+        follow_up=None,
+    ),
+    # 原本想放一筆「展場拿到名片、需求還沒問到」的客戶，讓「沒有原話就
+    # 不能產生跟進建議」那個 422 在 Demo 上看得到。但做不到 ——
+    # --reset 靠 raw_requirement 開頭的 [demo] 標記認自己建的資料，
+    # 所以原話一定不會是空的。要展示那個狀態，得在畫面上手動新增一筆。
+    dict(
+        name="賴俊宇", phone="0912345032", source=LeadSource.WEB_FORM,
+        status=LeadStatus.LOST, created_days_ago=60,
+        raw="想找二房，預算1100萬，後來說公司要外派所以先不買了",
+        fields=dict(budget_max=11000000, rooms=2),
+        interactions=[
+            (InteractionType.CALL, "客戶說要外派三年，暫時不考慮", 30),
         ],
         follow_up=None,
     ),
