@@ -82,6 +82,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/leads/follow-ups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Follow Ups
+         * @description 今天該聯絡誰。
+         *
+         *     路由必須註冊在 /{lead_id} 之前，否則 "follow-ups" 會被當成 lead_id
+         *     去比對，然後回一個看起來莫名其妙的 422。
+         */
+        get: operations["list_follow_ups_api_v1_leads_follow_ups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/leads/{lead_id}": {
         parameters: {
             query?: never;
@@ -121,12 +144,48 @@ export interface paths {
          *     做成同步是因為 MVP 階段一次只分析一筆，排背景工作要多一個 queue 與輪詢機制，
          *     複雜度換不到對應的好處；真的要批次分析時再改。
          *
+         *     **原話沒變的話不會重新呼叫模型**，直接沿用上一次的結果並把 `reused`
+         *     設成 true。同一段話重算一次結果本來就會一樣，那是純粹的浪費；
+         *     業務改了原話（客戶需求變了）再按，才是真的重新解析。
+         *
          *     可能的失敗：
          *     - 404 這位客戶不存在（或不是你的）
          *     - 422 這位客戶還沒填原始需求
          *     - 503 AI 暫時不可用 —— 客戶資料本身不受影響，前端顯示重試按鈕
          */
         post: operations["analyze_lead_api_v1_leads__lead_id__analyze_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/leads/{lead_id}/follow-up-suggestion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Suggest Follow Up
+         * @description 產生一則 AI 跟進建議：下一步動作、建議話術、建議時機。
+         *
+         *     由業務按按鈕觸發，同步等待。不做成「打開待跟進頁面就自動全部產生」——
+         *     一次列表可能有二十位客戶，那就是二十次 API 呼叫，
+         *     而業務今天其實只會打其中三通。
+         *
+         *     **這支 API 不會改動客戶的任何欄位**，包括下次提醒日。
+         *     建議是參考，不是系統替業務做的決定。
+         *
+         *     可能的失敗：
+         *     - 404 這位客戶不存在（或不是你的）
+         *     - 422 這位客戶既沒有原始需求也沒有互動紀錄，沒有東西可以據以建議
+         *     - 503 AI 暫時不可用
+         */
+        post: operations["suggest_follow_up_api_v1_leads__lead_id__follow_up_suggestion_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -215,6 +274,122 @@ export interface components {
              */
             created_at: string;
         };
+        /**
+         * FollowUpAnalysisRead
+         * @description 一次跟進建議的紀錄。
+         *
+         *     與 AIAnalysisRead 共用同一張表，但 parsed_result 的型別不同 ——
+         *     所以分成兩個 schema，而不是把型別放寬成 dict。
+         *     放寬的代價是前端生成出來的型別會變成 Record<string, never>，等於什麼都拿不到。
+         */
+        FollowUpAnalysisRead: {
+            /** Id */
+            id: number;
+            /** Analysis Type */
+            analysis_type: string;
+            parsed_result: components["schemas"]["FollowUpSuggestion"] | null;
+            /** Suggestion */
+            suggestion: string | null;
+            /** Score Snapshot */
+            score_snapshot: number | null;
+            /** Level Snapshot */
+            level_snapshot: string | null;
+            /** Prompt Version */
+            prompt_version: string;
+            /** Model */
+            model: string;
+            /** Prompt Tokens */
+            prompt_tokens: number | null;
+            /** Completion Tokens */
+            completion_tokens: number | null;
+            /** Latency Ms */
+            latency_ms: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * FollowUpItem
+         * @description 待跟進清單上的一列。
+         */
+        FollowUpItem: {
+            lead: components["schemas"]["LeadRead"];
+            /** Bucket */
+            bucket: string;
+            /** Days Overdue */
+            days_overdue: number;
+            /** Reason */
+            reason: string;
+        };
+        /**
+         * FollowUpResponse
+         * @description 待跟進清單，刻意分成兩堆而不是一份排序好的名單。
+         *
+         *     「新進未聯絡」與「到期跟進」對應兩種不同的業務動作：
+         *     一個是第一次接觸（搶時間），一個是維繫（別讓它冷掉）。
+         *     混在一起的話，業務打開看到 20 個人，
+         *     分不出哪些是還沒認識、哪些是快跑掉了。
+         */
+        FollowUpResponse: {
+            /** Viewing Confirm */
+            viewing_confirm: components["schemas"]["FollowUpItem"][];
+            /** New Uncontacted */
+            new_uncontacted: components["schemas"]["FollowUpItem"][];
+            /** Due */
+            due: components["schemas"]["FollowUpItem"][];
+            /** Muted Count */
+            muted_count: number;
+        };
+        /**
+         * FollowUpSuggestion
+         * @description AI 產生的跟進建議。
+         *
+         *     這是專案第一個「AI 生成自由文字」的功能，跟 ParsedRequirement 有根本差異：
+         *     需求解析有標準答案（客戶說了 2000 萬，答案就是 20000000），
+         *     跟進建議沒有 —— 同一位客戶有十種合理的跟法。
+         *
+         *     所以這裡不追求「答對」，而是把輸出切成三段，讓每一段都能被單獨檢查：
+         *
+         *         next_action      下一步動作     業務看得懂、做得到嗎
+         *         talking_point    建議話術       這是最花時間、最值得自動化的一段
+         *         suggested_timing 建議時機       跟客戶說過的話對得上嗎
+         *
+         *     切成三段而不是一整段自由文字，是為了讓評估有著力點 ——
+         *     一整段話只能整體給個「好/不好」，切開之後每一段各有各的判準。
+         *
+         *     ### evidence 這一欄是整個設計的重點
+         *
+         *     要求模型把「話術裡引用到的客戶資訊」逐字摘出來。
+         *     這一欄不是給業務看的，是給**評估**用的：
+         *     引用的句子必須逐字出現在輸入裡，這是「有沒有捏造」的可程式驗證版本。
+         *
+         *     沒有它的話，「AI 有沒有編造客戶沒說過的事」只能靠人一句一句讀，
+         *     或再叫另一個 LLM 判斷 —— 前者不可規模化，後者本身也會出錯。
+         */
+        FollowUpSuggestion: {
+            /**
+             * Next Action
+             * @description 下一步該做什麼，一句話
+             */
+            next_action: string;
+            /**
+             * Talking Point
+             * @description 建議的開場話術，可直接複製使用
+             */
+            talking_point: string;
+            /**
+             * Suggested Timing
+             * @description 建議什麼時候聯絡
+             */
+            suggested_timing: string;
+            /**
+             * Evidence
+             * @description 話術引用到的客戶資訊，逐字取自客戶原話或互動紀錄；沒有引用就是空陣列
+             */
+            evidence: string[];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -225,6 +400,12 @@ export interface components {
             type: components["schemas"]["InteractionType"];
             /** Content */
             content: string;
+            /** Next Follow Up Days */
+            next_follow_up_days?: number | null;
+            /** Viewing Scheduled At */
+            viewing_scheduled_at?: string | null;
+            /** Mute Follow Up */
+            mute_follow_up?: boolean | null;
         };
         /** InteractionRead */
         InteractionRead: {
@@ -257,6 +438,11 @@ export interface components {
         LeadAnalyzeResponse: {
             lead: components["schemas"]["LeadRead"];
             analysis: components["schemas"]["AIAnalysisRead"];
+            /**
+             * Reused
+             * @default false
+             */
+            reused: boolean;
         };
         /** LeadCreate */
         LeadCreate: {
@@ -279,6 +465,7 @@ export interface components {
              * @description 預計幾個月內購買
              */
             purchase_timeline?: number | null;
+            urgency?: components["schemas"]["Urgency"] | null;
             /** Name */
             name: string;
             /** Phone */
@@ -328,6 +515,13 @@ export interface components {
             purpose: components["schemas"]["Purpose"] | null;
             /** Purchase Timeline */
             purchase_timeline: number | null;
+            urgency: components["schemas"]["Urgency"] | null;
+            /** Next Follow Up At */
+            next_follow_up_at: string | null;
+            /** Viewing Scheduled At */
+            viewing_scheduled_at: string | null;
+            /** Follow Up Muted */
+            follow_up_muted: boolean;
             /** Lead Score */
             lead_score: number | null;
             lead_level: components["schemas"]["LeadLevel"] | null;
@@ -348,7 +542,24 @@ export interface components {
              * @default []
              */
             interactions: components["schemas"]["InteractionRead"][];
+            /**
+             * Score Reasons
+             * @default []
+             */
+            score_reasons: components["schemas"]["ScoreReasonRead"][];
             latest_analysis?: components["schemas"]["AIAnalysisRead"] | null;
+            latest_follow_up?: components["schemas"]["FollowUpAnalysisRead"] | null;
+        };
+        /**
+         * LeadFollowUpResponse
+         * @description POST /leads/{id}/follow-up-suggestion 的回應。
+         *
+         *     只回建議，不回 lead —— 因為產生建議不會改到客戶的任何欄位，
+         *     前端手上那份資料仍然是對的，沒必要多傳一份回去。
+         *     這跟 analyze 的回應刻意不一樣，差異本身就在說明兩支 API 的性質不同。
+         */
+        LeadFollowUpResponse: {
+            suggestion: components["schemas"]["FollowUpAnalysisRead"];
         };
         /**
          * LeadLevel
@@ -401,6 +612,13 @@ export interface components {
             purpose: components["schemas"]["Purpose"] | null;
             /** Purchase Timeline */
             purchase_timeline: number | null;
+            urgency: components["schemas"]["Urgency"] | null;
+            /** Next Follow Up At */
+            next_follow_up_at: string | null;
+            /** Viewing Scheduled At */
+            viewing_scheduled_at: string | null;
+            /** Follow Up Muted */
+            follow_up_muted: boolean;
             /** Lead Score */
             lead_score: number | null;
             lead_level: components["schemas"]["LeadLevel"] | null;
@@ -428,7 +646,7 @@ export interface components {
          * @description Lead 在銷售漏斗中的位置（對應 Dashboard 的 Lead Funnel）。
          * @enum {string}
          */
-        LeadStatus: "NEW" | "CONTACTED" | "INTERESTED" | "MEETING" | "NEGOTIATING" | "WON" | "LOST";
+        LeadStatus: "NEW" | "CONTACTED" | "INTERESTED" | "MEETING" | "VIEWING" | "NEGOTIATING" | "WON" | "LOST";
         /**
          * LeadUpdate
          * @description PATCH 用。所有欄位都是選填，只更新有帶的欄位。
@@ -462,6 +680,13 @@ export interface components {
             purpose?: components["schemas"]["Purpose"] | null;
             /** Purchase Timeline */
             purchase_timeline?: number | null;
+            urgency?: components["schemas"]["Urgency"] | null;
+            /** Next Follow Up At */
+            next_follow_up_at?: string | null;
+            /** Viewing Scheduled At */
+            viewing_scheduled_at?: string | null;
+            /** Follow Up Muted */
+            follow_up_muted?: boolean | null;
         };
         /**
          * ParsedRequirement
@@ -503,6 +728,8 @@ export interface components {
              * @description 預計幾個月內購買
              */
             purchase_timeline?: number | null;
+            /** @description 客戶表達出的急迫程度，沒表達就是 None */
+            urgency?: components["schemas"]["Urgency"] | null;
         };
         /**
          * PropertyType
@@ -520,6 +747,22 @@ export interface components {
          * @enum {string}
          */
         Purpose: "SELF_USE" | "INVESTMENT" | "BOTH" | "UNKNOWN";
+        /**
+         * ScoreReasonRead
+         * @description 一條計分理由。
+         *
+         *     這些理由**不存資料庫**，每次讀取時重算。
+         *     因為計分是確定性的規則，同樣的資料一定得到同樣的理由 ——
+         *     存起來只會多一份可能過期的副本。
+         */
+        ScoreReasonRead: {
+            /** Code */
+            code: string;
+            /** Label */
+            label: string;
+            /** Points */
+            points: number;
+        };
         /** Token */
         Token: {
             /** Access Token */
@@ -530,6 +773,26 @@ export interface components {
              */
             token_type: string;
         };
+        /**
+         * Urgency
+         * @description 客戶對「多久要買到」表達出的態度。
+         *
+         *     為什麼不直接用 purchase_timeline 就好？
+         *
+         *     因為真實客戶很少會講「我三個月內要買到房子」。
+         *     他們講的是「我下個月要過去上班，所以有點急」——
+         *     有明確的急迫感，卻沒有任何可以填進 purchase_timeline 的月數。
+         *     只靠月數的話，這種客戶在 Lead Score 上會被當成「沒有時間壓力」，
+         *     排在該優先聯絡的名單後面。
+         *
+         *     這跟 budget_is_approximate 是同一招：不讓 AI 去推算數字，
+         *     而是讓它記錄客戶的語氣，換算與計分交給 Rule Engine。
+         *
+         *     刻意只分兩級加上 null。分越細，AI 判斷錯的機率越高，
+         *     而這一欄本來就比其他欄位主觀。
+         * @enum {string}
+         */
+        Urgency: "HIGH" | "LOW";
         /** UserCreate */
         UserCreate: {
             /** Name */
@@ -744,6 +1007,26 @@ export interface operations {
             };
         };
     };
+    list_follow_ups_api_v1_leads_follow_ups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FollowUpResponse"];
+                };
+            };
+        };
+    };
     get_lead_api_v1_leads__lead_id__get: {
         parameters: {
             query?: never;
@@ -857,6 +1140,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LeadAnalyzeResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    suggest_follow_up_api_v1_leads__lead_id__follow_up_suggestion_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                lead_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeadFollowUpResponse"];
                 };
             };
             /** @description Validation Error */

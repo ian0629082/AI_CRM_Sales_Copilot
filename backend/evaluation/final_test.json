@@ -1,0 +1,374 @@
+{
+  "meta": {
+    "version": "v1",
+    "field_count": 11,
+    "case_count": 15,
+    "status": "LOCKED",
+    "authored_by": "專案作者（具房仲業務實務經驗），出題時未讀過 prompt 內容",
+    "rules_reference": "docs/PROGRESS.md 第三節「抽取規則」+ 本檔 meta.extra_rules",
+    "how_to_read": [
+      "這是期末考資料集：鎖到 Sprint 7 上線前才第一次執行。",
+      "跟 dataset.json / holdout.json 最大的差別是「出題的人不是 prompt 的作者」，",
+      "而且句子取材自真實業務場景 —— 有廢話、有現況陳述、有問句、有干擾數字。",
+      "**任何情況下都不得因為這份的結果去修改 prompt。** 一改，它就變成第三個練習題。"
+    ],
+    "extra_rules": [
+      "學校、園區名稱保留原話當 location，把「附近」「周邊」這類附加詞去掉；建案名稱仍填 null。",
+      "客戶自己推翻的條件（「原本想說…但現在猶豫」）仍然保留，業務自己會判斷。",
+      "間接提到車輛（「有休旅車」「沒辦法停機械車位」）算車位需求，parking 填 true。",
+      "客戶給兩個預算數字且後者是上限（「控制在1000萬，最高不超過1500萬」）時，只填上限。",
+      "urgency：客戶明確表達急迫（「有點急」）填 HIGH，明確表達不急（「不急」「猶豫」）填 LOW，沒表達時間態度填 null。看的是語氣，跟有沒有講出月數無關。"
+    ],
+    "known_coverage_gaps": [
+      "budget_min：0 筆。真實句子裡客戶很少講預算區間，多半只講一個上限。",
+      "purchase_timeline：0 筆。客戶講的時間多半是工作或行程，不是購屋時程。",
+      "budget_is_approximate：僅 2 筆為 true。",
+      "這三個欄位在這份資料上量不到，報告裡它們的 Recall 會是「—」。這是事實，不是缺陷。"
+    ]
+  },
+  "cases": [
+    {
+      "id": "final-001",
+      "raw_requirement": "小資族，預算800萬想找三房有車位，區域希望在南區、大里，自備款有150萬。",
+      "tags": [
+        "location_multiple",
+        "budget_distractor",
+        "parking_true"
+      ],
+      "note": "「自備款150萬」是干擾數字，不是預算。兩個區域取先講的「南區」。",
+      "expected": {
+        "location": "南區",
+        "budget_min": null,
+        "budget_max": 8000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": true,
+        "purpose": null,
+        "purchase_timeline": null,
+        "urgency": null
+      }
+    },
+    {
+      "id": "final-002",
+      "raw_requirement": "希望找中興大學附近的透天或別墅，屋齡希望在震後興建的，需要有雙車位，面寬5米以上，預算2000萬左右。",
+      "tags": [
+        "location_landmark",
+        "age_requires_inference",
+        "property_type_multiple"
+      ],
+      "note": "「震後興建」要先知道 921 是哪一年、再減出年數才能填 building_age_max，屬於推算，標 null。房屋類型講了兩種，取先講的透天。「面寬5米」我們沒有對應欄位，要忽略。",
+      "expected": {
+        "location": "中興大學",
+        "budget_min": null,
+        "budget_max": 20000000,
+        "budget_is_approximate": true,
+        "rooms": null,
+        "property_type": "TOWNHOUSE",
+        "building_age_max": null,
+        "parking": true,
+        "purpose": null,
+        "purchase_timeline": null,
+        "urgency": null
+      }
+    },
+    {
+      "id": "final-003",
+      "raw_requirement": "找台中市區兩房的大樓，屋齡10年內，沒有預算考量，要有漂亮裝潢。",
+      "tags": [
+        "budget_distractor",
+        "age_number"
+      ],
+      "note": "「沒有預算考量」不是數字，預算欄位全部留空。",
+      "expected": {
+        "location": "台中市區",
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": 2,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": 10,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null,
+        "urgency": null
+      }
+    },
+    {
+      "id": "final-004",
+      "raw_requirement": "我家有3大1小1寵物，現在住三房的大樓，平常是還夠住，但有親戚來過夜就會太擠，我非常討厭他們過夜，但是長輩我也沒辦法，想換透天來住，但我不知道現在房價如何，我希望找南屯區的。",
+      "tags": [
+        "current_state_distractor",
+        "verbose",
+        "purpose_implied"
+      ],
+      "note": "最關鍵的一題：「現在住三房的大樓」是客戶的**現況**不是需求，rooms 與 property_type 都不能照抄。他要的是透天。「不知道現在房價如何」等於沒有預算。",
+      "expected": {
+        "location": "南屯區",
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "TOWNHOUSE",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "SELF_USE",
+        "purchase_timeline": null,
+        "urgency": null
+      }
+    },
+    {
+      "id": "final-005",
+      "raw_requirement": "我想看舜元帝磐這個社區大樓的房子，你能幫我介紹幾間給我參考嗎?",
+      "tags": [
+        "location_project_name",
+        "question_form"
+      ],
+      "note": "「舜元帝磐」是建案名稱不是區域，location 標 null。「社區大樓」屬於電梯大樓。",
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null,
+        "urgency": null
+      }
+    },
+    {
+      "id": "final-006",
+      "raw_requirement": "我現在住霧峰，工作在台中市，原本想說買中區中古大樓就好，但是我看了幾間，現在霧峰房價都這麼高了，而且市區中古屋都不便宜，我現在有點猶豫，你可以建議我嗎?",
+      "tags": [
+        "current_state_distractor",
+        "retracted_requirement",
+        "verbose"
+      ],
+      "note": "「住霧峰」「工作在台中市」都是現況，不是想買的區域。真正表達過購買意向的是「中區」。「中古大樓」的中古沒有年數，building_age_max 標 null。",
+      "expected": {
+        "location": "中區",
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null,
+        "urgency": "LOW"
+      }
+    },
+    {
+      "id": "final-007",
+      "raw_requirement": "我有300萬自備款，請問我能看多少預算的房子?",
+      "tags": [
+        "all_null",
+        "budget_distractor",
+        "question_form"
+      ],
+      "note": "自備款不是預算，而且客戶是在問問題、不是在提需求。整筆全部留空。",
+      "expected": {
+        "location": null,
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null,
+        "urgency": null
+      }
+    },
+    {
+      "id": "final-008",
+      "raw_requirement": "找台中市西屯區的大樓，屋齡不限，但一定要平面車位，然後要高樓層有視野，附近生活機能要便利，預算3000萬以內。",
+      "tags": [
+        "age_no_number",
+        "parking_true",
+        "budget_exact"
+      ],
+      "expected": {
+        "location": "台中市西屯區",
+        "budget_min": null,
+        "budget_max": 30000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": null,
+        "parking": true,
+        "purpose": null,
+        "purchase_timeline": null,
+        "urgency": null
+      }
+    },
+    {
+      "id": "final-009",
+      "raw_requirement": "我要找北屯區的房子，預算2500萬，我有頭期款200萬。",
+      "tags": [
+        "budget_distractor"
+      ],
+      "note": "頭期款 200 萬是干擾數字。",
+      "expected": {
+        "location": "北屯區",
+        "budget_min": null,
+        "budget_max": 25000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": null,
+        "purchase_timeline": null,
+        "urgency": null
+      }
+    },
+    {
+      "id": "final-010",
+      "raw_requirement": "我要找台中市南區的公寓，不希望樓層太高要爬很久，最好是一樓的產品，前面還有可以停車的位置",
+      "tags": [
+        "property_type",
+        "parking_indirect"
+      ],
+      "note": "「前面還有可以停車的位置」是停車需求，parking 填 true。「一樓」「樓層太高」我們沒有對應欄位。",
+      "expected": {
+        "location": "台中市南區",
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": "APARTMENT",
+        "building_age_max": null,
+        "parking": true,
+        "purpose": null,
+        "purchase_timeline": null,
+        "urgency": null
+      }
+    },
+    {
+      "id": "final-011",
+      "raw_requirement": "找西區靠近美術館周邊1公里內的大樓，最少要三房並需要有車位，預算1800萬以內，管理費不要太貴。",
+      "tags": [
+        "location_distractor",
+        "rooms_range",
+        "number_distractor"
+      ],
+      "note": "「西區」是地名，「美術館周邊1公里內」是附加描述要去掉。「1公里」是干擾數字。「最少要三房」取下限 3。",
+      "expected": {
+        "location": "西區",
+        "budget_min": null,
+        "budget_max": 18000000,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": null,
+        "parking": true,
+        "purpose": null,
+        "purchase_timeline": null,
+        "urgency": null
+      }
+    },
+    {
+      "id": "final-012",
+      "raw_requirement": "我想找南區20年左右屋齡的大樓，公設比不要太高，最好不要超過15%，然後房間最少要三房，能再多更好，一定要有平面車位，房子最好能便宜一點，低於時價登錄那種，我不急有物件再通知我。",
+      "tags": [
+        "age_number",
+        "number_distractor",
+        "rooms_range",
+        "timeline_vague"
+      ],
+      "note": "「15%」是公設比，不是屋齡也不是預算，是最容易被抓錯的干擾數字。「便宜一點」不是金額。「不急」→ purchase_timeline 留空。",
+      "expected": {
+        "location": "南區",
+        "budget_min": null,
+        "budget_max": null,
+        "budget_is_approximate": false,
+        "rooms": 3,
+        "property_type": "ELEVATOR_BUILDING",
+        "building_age_max": 20,
+        "parking": true,
+        "purpose": null,
+        "purchase_timeline": null,
+        "urgency": "LOW"
+      }
+    },
+    {
+      "id": "final-013",
+      "raw_requirement": "我是陳太太介紹來的，他說你們很專業，可以幫我小孩找房子，我們住外縣市去一趟台中很遠，希望能一次看多間一點，要找逢甲大學周邊，需要騎腳踏車5分鐘內可到，不要有漏水或事故的房子，至少兩房以上，之後可以分租給同學，預算希望能控制在1000萬，最高不要超過1500萬。",
+      "tags": [
+        "verbose",
+        "number_distractor",
+        "purpose_both",
+        "budget_two_numbers"
+      ],
+      "note": "「騎腳踏車5分鐘」是距離不是購屋時程，這是最容易被填進 purchase_timeline 的陷阱。「住外縣市」是現況不是想買的區域。給小孩住＋分租給同學 → BOTH。兩個預算數字只取上限。",
+      "expected": {
+        "location": "逢甲大學",
+        "budget_min": null,
+        "budget_max": 15000000,
+        "budget_is_approximate": false,
+        "rooms": 2,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": null,
+        "purpose": "BOTH",
+        "purchase_timeline": null,
+        "urgency": null
+      }
+    },
+    {
+      "id": "final-014",
+      "raw_requirement": "我想要找靠近大里軟體園區的房子，我下個月要過去上班，所以有點急，我們目前是兩夫妻要住，我們有休旅車所以沒辦法停機械車位，太太不會開車，所以需要房子離公車站近點，搭公車方便，預算700萬，不用貸款可以全部現金付款。",
+      "tags": [
+        "location_landmark",
+        "timeline_distractor",
+        "parking_indirect",
+        "purpose_implied"
+      ],
+      "note": "「下個月要過去上班」是工作行程，不是購屋時程；客戶只說「有點急」，沒有給明確的購屋月數，所以 purchase_timeline 留空。「有休旅車所以沒辦法停機械車位」算車位需求。",
+      "expected": {
+        "location": "大里軟體園區",
+        "budget_min": null,
+        "budget_max": 7000000,
+        "budget_is_approximate": false,
+        "rooms": null,
+        "property_type": null,
+        "building_age_max": null,
+        "parking": true,
+        "purpose": "SELF_USE",
+        "purchase_timeline": null,
+        "urgency": "HIGH"
+      }
+    },
+    {
+      "id": "final-015",
+      "raw_requirement": "我們有換屋需求，小間換大間，要找南區10-15年左右的別墅，房間數需要4間，且有兩台休旅車，家中有小孩所以想找社區型的比較安全，但我們不希望鄰居有人養寵物，希望總價在2500萬左右，且我們一定要貸8成。",
+      "tags": [
+        "age_range",
+        "budget_approximate",
+        "parking_indirect",
+        "purpose_implied"
+      ],
+      "note": "「10-15年左右」的上限是 15。「貸8成」是干擾數字。「有兩台休旅車」算車位需求。「換屋」「家中有小孩」→ 自住。",
+      "expected": {
+        "location": "南區",
+        "budget_min": null,
+        "budget_max": 25000000,
+        "budget_is_approximate": true,
+        "rooms": 4,
+        "property_type": "VILLA",
+        "building_age_max": 15,
+        "parking": true,
+        "purpose": "SELF_USE",
+        "purchase_timeline": null,
+        "urgency": null
+      }
+    }
+  ]
+}

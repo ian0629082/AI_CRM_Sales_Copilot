@@ -27,14 +27,25 @@ const loginSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 
+/**
+ * 公開的展示帳號。
+ *
+ * 直接寫在前端不是疏忽：這組帳密本來就是要給所有人用的，
+ * 藏起來只會讓想看作品的人多一道無謂的手續。
+ * 它保護的東西是「其他人的資料」，而那是後端 owner_id 過濾在守的，
+ * 不是靠這組帳密沒人知道。
+ */
+const DEMO_ACCOUNT = { email: "demo@example.com", password: "demo1234" };
+
 export default function LoginPage() {
   const { login, user, isLoading } = useAuth();
   const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [demoPending, setDemoPending] = useState(false);
 
   // 已經登入的人不該再看到登入頁
   useEffect(() => {
-    if (!isLoading && user) router.replace("/leads");
+    if (!isLoading && user) router.replace("/dashboard");
   }, [isLoading, user, router]);
 
   const {
@@ -53,6 +64,20 @@ export default function LoginPage() {
       setServerError(
         error instanceof ApiError ? error.message : "登入失敗，請稍後再試",
       );
+    }
+  }
+
+  async function onTryDemo() {
+    setServerError(null);
+    setDemoPending(true);
+    try {
+      await login(DEMO_ACCOUNT.email, DEMO_ACCOUNT.password);
+    } catch (error) {
+      setServerError(
+        error instanceof ApiError ? error.message : "登入失敗，請稍後再試",
+      );
+    } finally {
+      setDemoPending(false);
     }
   }
 
@@ -100,10 +125,35 @@ export default function LoginPage() {
               </p>
             ) : null}
 
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isSubmitting || demoPending}
+            >
               {isSubmitting ? "登入中..." : "登入"}
             </Button>
           </form>
+
+          {/* 一鍵進入放在表單之後、而且是次要樣式：
+              真正要用這個系統的人是輸入自己的帳密，
+              展示帳號是給「先看看這是什麼」的人用的。
+
+              但它必須存在 —— 一個要求先註冊才能看的作品集，
+              大部分人在註冊那一步就關掉了。 */}
+          <div className="mt-4 space-y-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={onTryDemo}
+              disabled={isSubmitting || demoPending}
+            >
+              {demoPending ? "準備中..." : "直接看 Demo"}
+            </Button>
+            <p className="text-center text-xs text-muted-foreground">
+              用展示帳號登入，裡面有 32 位虛構客戶可以操作
+            </p>
+          </div>
 
           <p className="mt-4 text-center text-sm text-muted-foreground">
             還沒有帳號？

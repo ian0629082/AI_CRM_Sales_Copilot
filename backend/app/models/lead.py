@@ -1,8 +1,9 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    Date,
     DateTime,
     Enum as SAEnum,
     ForeignKey,
@@ -15,7 +16,15 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
-from app.models.enums import LeadLevel, LeadSource, LeadStatus, PropertyType, Purpose
+from app.models.ai_analysis import FOLLOW_UP, REQUIREMENT_PARSING
+from app.models.enums import (
+    LeadLevel,
+    LeadSource,
+    LeadStatus,
+    PropertyType,
+    Purpose,
+    Urgency,
+)
 
 
 class Lead(Base):
@@ -74,6 +83,42 @@ class Lead(Base):
     purchase_timeline: Mapped[int | None] = mapped_column(
         Integer, comment="預計幾個月內購買"
     )
+    # 客戶表達出的急迫程度。真實客戶很少講明確月數，卻常常講「有點急」，
+    # 少了這一欄，那種客戶在 Lead Score 上會被當成沒有時間壓力。
+    urgency: Mapped[Urgency | None] = mapped_column(
+        SAEnum(Urgency, native_enum=False, length=10)
+    )
+
+    # --- 跟進提醒（Sprint 5）---
+    # 下次該聯絡的日期，由業務在記錄互動時決定，系統只提供預設值。
+    # 一度想寫一整張「什麼階段隔幾天」的規則表，後來拿掉了：
+    # 客戶掛電話前說「我下週三再回你」，業務填 7 天就對了，規則猜不到那句話。
+    next_follow_up_at: Mapped[date | None] = mapped_column(Date, index=True)
+
+    # 已經跟客戶約好的帶看時間。
+    #
+    # 這是系統裡第一個「未來的行程」——互動紀錄記的都是已經發生的事，
+    # 存不進同一個地方。
+    #
+    # 為什麼要有它：業務實務上，帶看前一天一定要先聯絡客戶確認。
+    # 客戶臨時有事卻沒講，業務就白跑一趟；先確認一次，
+    # 也剛好是再接觸一次的機會。
+    #
+    # 存 datetime 而不是 date，是因為提醒文案要講得出「明天下午 3 點」——
+    # 只講「明天有帶看」，業務還是得自己翻紀錄找幾點。
+    #
+    # 放在 Lead 上而不是 Interaction 上：一位客戶同時只會有一個「下次帶看」，
+    # 而且跟進提醒的判斷本來就在讀 lead 的欄位。
+    viewing_scheduled_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), index=True
+    )
+
+    # 業務明確關掉提醒（成交、流失、確定放棄）。
+    # 與 next_follow_up_at 為 NULL 分開表示：NULL 是「還沒設」，
+    # 這個是「刻意不要」。兩者混在一起的話，就分不出「漏設」與「不用設」。
+    follow_up_muted: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false()
+    )
 
     # --- Rule Engine 計算（Sprint 5）---
     lead_score: Mapped[int | None] = mapped_column(Integer, index=True)
@@ -107,11 +152,26 @@ class Lead(Base):
         order_by="AIAnalysis.id.desc()",
     )
 
-    @property
-    def latest_analysis(self):
-        """最近一次 AI 分析。ai_analyses 已由新到舊排序，取第一筆即可。
+    def _latest_of(self, analysis_type: str):
+        """ai_analyses 已由新到舊排序，取第一筆符合類型的即可。
+
+        **一定要過濾 analysis_type。**
+        這張表同時存需求解析與跟進建議兩種紀錄，
+        不過濾的話，業務按一次「AI 跟進建議」之後，
+        欄位上的「AI 解析」徽章就會全部消失 —— 因為最新那一筆變成了建議，
+        它的 parsed_result 是 null，比對不到任何欄位。
 
         放在 model 上而不是 service 裡：這是「Lead 這個東西本身的性質」，
         每個需要它的地方（API、日後的 n8n、Agent）都能直接用，不必各自再寫一次。
         """
-        return self.ai_analyses[0] if self.ai_analyses else None
+        return next((a for a in self.ai_analyses if a.analysis_type == analysis_type), None)
+
+    @property
+    def latest_analysis(self):
+        """最近一次需求解析。前端靠它決定哪些欄位要掛「AI 解析」徽章。"""
+        return self._latest_of(REQUIREMENT_PARSING)
+
+    @property
+    def latest_follow_up(self):
+        """最近一次跟進建議。"""
+        return self._latest_of(FOLLOW_UP)

@@ -1,0 +1,55 @@
+# Render Blueprint：後端部署設定。
+#
+# 把設定寫成檔案而不是在網頁上點一點，理由跟 CORS_ORIGINS 寫成環境變數一樣 ——
+# 網頁上點出來的設定沒有紀錄，換一台機器或砍掉重建時，
+# 「當初到底填了什麼」只能靠記憶。
+#
+# 資料庫不在這裡：用的是 Neon（AWS ap-southeast-1），不是 Render 自己的 Postgres。
+
+services:
+  - type: web
+    name: ai-crm-backend
+    runtime: python
+    plan: free
+    # 跟 Neon 同一個區域，跨區的每一次查詢都要多付一趟往返。
+    region: singapore
+    rootDir: backend
+
+    # migration 放在 build 而不是 start：
+    # start command 每次休眠喚醒都會重跑，migration 是一次性的事情。
+    #
+    # 代價要講清楚：build 成功但部署失敗時，資料庫已經遷移完成、程式卻還是舊版。
+    # 正規做法是用 preDeployCommand，但那需要付費方案。
+    # 這個專案只有一個人在改 schema，遷移前後都能自己確認，所以接受這個代價。
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+
+    # $PORT 由 Render 指定，不能寫死。--host 0.0.0.0 才收得到容器外的連線。
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+
+    # 讓 Render 知道服務活著。用現成的 /health，它不碰資料庫也不碰 OpenAI，
+    # 所以它回 200 只代表「程式起來了」，不代表整條路都通。
+    healthCheckPath: /health
+
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.10"
+
+      # Neon 的連線字串。含密碼，所以不進版控（sync: false 表示要在
+      # Render 的網頁上手動填，Blueprint 不會覆蓋它）。
+      - key: DATABASE_URL
+        sync: false
+
+      # 由 Render 產生一組隨機值，不沿用本機 .env 那組 ——
+      # 本機那組出現在開發機、備份、以及任何一次貼給別人看的截圖裡。
+      # 注意：換掉這個值會讓所有已簽發的 token 立刻失效（使用者要重新登入），
+      # 那正是它該有的行為。
+      - key: JWT_SECRET
+        generateValue: true
+
+      - key: OPENAI_API_KEY
+        sync: false
+
+      # 前端上 Vercel 之後填正式網域，多個用逗號分隔。
+      # 這個值填錯的症狀是前端整片失敗，而且在瀏覽器上看起來像「後端掛了」。
+      - key: CORS_ORIGINS
+        sync: false

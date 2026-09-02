@@ -926,30 +926,37 @@ Demo 資料全部使用虛構客戶資料。
 
 ---
 
-### Phase 19：Docker
+### Phase 19：Docker —— **決定不做**
 
-加入：
+原本規劃 `Dockerfile` + `docker-compose.yml`（frontend / backend / postgres）。
+實際評估之後拿掉了，理由是**這個專案的每一個預設用途都不成立**：
 
-```text
-Dockerfile
-docker-compose.yml
-```
+| Docker 常見的用途 | 在這個專案 |
+|---|---|
+| 部署到雲端 | 用不到。Render 支援直接跑 Python，Vercel 跑 Next.js 完全不碰 Docker |
+| 本機起完整環境（含資料庫） | 用不到。資料庫在 Neon 雲端，本機不需要跑 Postgres 容器 |
+| 環境一致性 | 用不到。單人開發，一台機器 |
+| CI 環境 | 用不到。GitHub Actions 用 `setup-python` 更快 |
 
-包含：
+剩下唯一的理由是「常見的技術棧裡都有它」。
+那不是假的理由，但它換不到這個代價：
 
-```text
-frontend
-backend
-postgres
-```
+**第一次部署時，未知數要越少越好。** 用 Docker 部署失敗時，
+分不清是 Dockerfile 寫錯、環境變數沒設對、還是程式本身的問題 ——
+三個變數同時未知，查起來會非常痛苦。
 
-目標：
+> 這一點在 Sprint 7 實際部署時得到印證：光是「三個環境變數還沒填」
+> 就讓第一次部署失敗了。如果中間還隔著一層 Docker，
+> 那個錯誤訊息會更難指向真正的原因。
 
-```bash
-docker compose up
-```
+**而且沒在用的 Dockerfile 會腐爛。** 改了依賴、換了 Python 版本之後它會悄悄壞掉，
+而壞掉的時間點是「哪天真的想用它」—— 那通常是最急的時候。
 
-即可啟動專案。
+> 知道 Docker 在什麼情況下**才真的必要**（多人協作、需要本機起依賴服務、
+> 部署目標不提供 runtime），比在不需要的地方放一個有用得多。
+
+日後若真的需要（例如換到不提供 Python runtime 的部署平台），
+再補上並**實際用它部署**，不要只是放著。
 
 ---
 
@@ -1311,16 +1318,15 @@ Security
 完成：
 
 ```text
-Docker
 GitHub Actions
 Production Database
-Frontend Deploy
-Backend Deploy
+Frontend Deploy      Vercel
+Backend Deploy       Render（直接跑 Python，不用 Docker，理由見 Phase 19）
 ```
 
 到這個階段：
 
-> 第一版正式完成，可以開始放履歷與作品網站。
+> 第一版正式完成。
 
 ### Sprint 8：Automation
 
@@ -1460,7 +1466,7 @@ GitHub README 建議：
 
 ## 14. Demo 設計
 
-Demo 不應要求面試官：
+Demo 不應該要求第一次點進來的人先走完這一串：
 
 ```text
 註冊
@@ -1612,7 +1618,7 @@ Future Roadmap
 
 ---
 
-## 18. 履歷呈現方式
+## 18. 專案能力總覽
 
 ### AI CRM Sales Copilot｜個人專案
 
@@ -1627,7 +1633,6 @@ Future Roadmap
 - 建立 AI Follow-up Recommendation
 - 建立 AI Evaluation Dataset 驗證抽取效果
 - 建立 CRM Dashboard
-- 使用 Docker 建立可部署環境
 - 建立 CI/CD Pipeline
 - 後續加入 n8n Automation
 - 後續加入 RAG Knowledge Base
@@ -1668,11 +1673,9 @@ Testing
         ↓
 Error Handling
         ↓
-Docker
-        ↓
 Deployment
 ────────────────────
-MVP 完成，可開始投履歷
+MVP 完成
 ────────────────────
         ↓
 n8n
@@ -1742,4 +1745,4 @@ RAG
 - RAG 能力
 - System Design 能力
 
-的完整 AI 求職作品。
+的完整 AI 應用專案。

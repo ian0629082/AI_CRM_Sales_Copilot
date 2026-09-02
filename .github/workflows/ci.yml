@@ -1,0 +1,90 @@
+# 每次推送都跑後端測試與前端建置。
+#
+# 這份 workflow 刻意不提供 OPENAI_API_KEY —— 見下方 backend job 的說明。
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop, "feature/**"]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  backend:
+    name: 後端測試
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      # 測試自己會開一個暫存 SQLite（見 tests/conftest.py），這個值只是為了
+      # 讓 Settings 通過驗證，不會有任何一次查詢真的送到這裡。
+      DATABASE_URL: "sqlite:///./ci-placeholder.db"
+      # config.py 在啟動時就擋掉少於 32 字元的密鑰，所以這裡也得給足長度。
+      # 這組字串只在 CI 存在，不是任何環境的真實密鑰。
+      JWT_SECRET: "ci-only-placeholder-not-a-real-secret-value"
+      # 刻意不設 OPENAI_API_KEY：
+      # 所有測試都用假的 LLMProvider，而且有兩支測試專門守著
+      # 「沒設 key 的環境仍要能跑完整個 CRM，只是那顆按鈕回 503」。
+      # 不給 key 的話，那兩支測試才是在真實條件下跑，
+      # 而且 CI 永遠不會因為模型的隨機性或額度問題而變紅。
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: 安裝依賴
+        run: pip install -r requirements.txt
+
+      - name: 跑測試
+        run: pytest -q
+
+      - name: 檢查 openapi.json 有沒有跟後端一起更新
+        # 後端改了 schema 卻忘了匯出，前端型別就會停在舊版本，
+        # 而那種錯誤要等到畫面空白時才會被發現。
+        # 這一步重新匯出一次，內容有差就讓 CI 紅在這裡。
+        run: |
+          python -m scripts.export_openapi
+          if ! git diff --quiet ../frontend/openapi.json; then
+            echo "::error::openapi.json 與後端 schema 不一致。請在 backend 執行 python -m scripts.export_openapi、在 frontend 執行 npm run gen:api，兩個檔一起提交。"
+            git diff --stat ../frontend/openapi.json
+            exit 1
+          fi
+
+  frontend:
+    name: 前端建置
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: 安裝依賴
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: 建置
+        # 型別由後端 OpenAPI 生成，所以「後端改了欄位、前端沒跟上」
+        # 會在這一步編譯失敗 —— 這正是要的效果。
+        env:
+          # client.ts 在模組載入時就會檢查這個變數，沒有的話 build 直接失敗。
+          # 建置階段只需要它存在且格式正確，不會真的連線。
+          NEXT_PUBLIC_API_BASE_URL: "http://127.0.0.1:8000/api/v1"
+        run: npm run build

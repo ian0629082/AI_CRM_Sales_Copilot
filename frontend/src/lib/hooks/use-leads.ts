@@ -17,6 +17,7 @@ export const leadKeys = {
   all: ["leads"] as const,
   list: (params: LeadListParams) => [...leadKeys.all, "list", params] as const,
   detail: (id: number) => [...leadKeys.all, "detail", id] as const,
+  followUps: () => [...leadKeys.all, "follow-ups"] as const,
 };
 
 export function useLeads(params: LeadListParams = {}) {
@@ -31,6 +32,13 @@ export function useLead(id: number) {
     queryKey: leadKeys.detail(id),
     queryFn: () => leadsApi.getLead(id),
     enabled: Number.isFinite(id) && id > 0,
+  });
+}
+
+export function useFollowUps() {
+  return useQuery({
+    queryKey: leadKeys.followUps(),
+    queryFn: () => leadsApi.listFollowUps(),
   });
 }
 
@@ -65,6 +73,21 @@ export function useAnalyzeLead(id: number) {
     },
     // 不自動重試：這一次呼叫是有成本的（會真的花錢打 OpenAI）。
     // 要不要再試一次，交給使用者按重試按鈕決定。
+    retry: false,
+  });
+}
+
+/**
+ * 請 AI 給一則跟進建議。
+ *
+ * 刻意**不**讓任何快取失效：這支 API 不會改動客戶的欄位，
+ * 讓 lead 重新抓一次只是白跑一趟。
+ * 建議本身留在 mutation 的 data 裡就好，畫面直接讀那個。
+ */
+export function useSuggestFollowUp(id: number) {
+  return useMutation({
+    mutationFn: () => leadsApi.suggestFollowUp(id),
+    // 跟 useAnalyzeLead 同樣不自動重試：每一次呼叫都會真的花錢。
     retry: false,
   });
 }

@@ -108,17 +108,22 @@ def test_always_answering_false_does_not_inflate_recall():
 
 
 def test_field_accuracy_counts_every_field_of_every_case():
-    """一筆全對、一筆錯一個欄位 → 20 個欄位裡對 19 個。"""
+    """一筆全對、一筆錯一個欄位 → 兩筆的欄位總數裡只錯一個。
+
+    分母用 len(FIELDS) 推導而不是寫死數字：
+    日後再加欄位時，這個測試該驗的性質沒變，不該因為算術而紅。
+    """
     cases = [
         _case("case-1", _expected(location="七期"), _expected(location="七期")),
         _case("case-2", _expected(location="信義區"), _expected(location="大安區")),
     ]
     report = build_report(model="m", prompt_version="v", cases=cases)
 
-    assert report.field_accuracy == pytest.approx(19 / 20)
+    total = 2 * len(FIELDS)
+    assert report.field_accuracy == pytest.approx((total - 1) / total)
 
 
-def test_exact_match_rate_requires_all_ten_fields():
+def test_exact_match_rate_requires_every_field():
     """完全正確率是最嚴格的指標：錯一個欄位，整筆就不算對。"""
     cases = [
         _case("case-1", _expected(rooms=3), _expected(rooms=3)),
@@ -135,12 +140,13 @@ def test_hallucination_rate_is_measured_against_empty_fields_only():
     用全部欄位當分母會把這個數字稀釋掉：
     客戶講了很多的案例會讓捏造率看起來變低，但模型的行為根本沒變。
     """
-    # 客戶只講了房數，其餘 9 個欄位是空的；模型多生了一個 location
+    # 客戶只講了房數，其餘欄位都是空的；模型多生了一個 location
     case = _case("case-1", _expected(rooms=3), _expected(rooms=3, location="七期"))
     report = build_report(model="m", prompt_version="v", cases=[case])
 
-    # 9 個空欄位中捏造了 1 個
-    assert report.hallucination_rate == pytest.approx(1 / 9)
+    # 分母是「空欄位數」（總欄位減掉有值的 rooms），不是全部欄位
+    empty_fields = len(FIELDS) - 1
+    assert report.hallucination_rate == pytest.approx(1 / empty_fields)
 
 
 def test_precision_and_recall_are_none_when_there_is_nothing_to_measure():
@@ -194,7 +200,16 @@ def test_median_latency_and_token_totals():
 # ---------------------------------------------------------------- 資料集本身
 
 
-DATASET_FILES = ("dataset.json", "holdout.json")
+DATASET_FILES = ("dataset.json", "holdout.json", "final_test.json")
+
+# final_test.json 是取材自真實業務場景的句子，不是照規則造出來的，
+# 所以有幾個欄位天然沒被考到 —— 真實客戶很少講預算區間，
+# 講的時間也多半是工作行程而不是購屋時程。
+# 這是這份資料的事實，不是它的缺陷，所以在覆蓋率檢查上豁免這幾欄，
+# 並把原因記在該檔的 meta.known_coverage_gaps 裡。
+COVERAGE_EXEMPT = {
+    "final_test.json": {"budget_min", "purchase_timeline", "budget_is_approximate"},
+}
 
 
 def _load(filename: str) -> dict:
@@ -207,7 +222,7 @@ def _load(filename: str) -> dict:
 
 @pytest.mark.parametrize("filename", DATASET_FILES)
 def test_dataset_is_well_formed(filename):
-    """資料集的每一筆都要有完整的 10 個欄位標註。
+    """資料集的每一筆都要有 FIELDS 裡的每一個欄位標註。
 
     少標一個欄位不會讓程式壞掉，只會讓那個欄位被當成 null 靜靜地算進統計，
     然後產出一個沒人發現是錯的準確率。所以這裡要擋住。
@@ -253,21 +268,63 @@ def test_dataset_covers_every_field_with_a_real_value(filename):
     報告上看起來有那一列，實際上什麼都沒量。
     """
     cases = _load(filename)["cases"]
+    exempt = COVERAGE_EXEMPT.get(filename, set())
 
     for name in FIELDS:
+        if name in exempt:
+            continue
         filled = sum(
             1 for c in cases if not is_empty(name, c["expected"].get(name))
         )
         assert filled >= 3, f"{filename} 的欄位 {name} 只有 {filled} 筆非空答案，樣本太少"
 
 
-def test_dev_and_holdout_share_no_sentences():
-    """兩份資料集不能有重複的句子。
+def test_coverage_exemptions_are_documented():
+    """豁免不能是偷偷加的，一定要在資料集裡寫明原因。
 
-    只要有一句重疊，holdout 就不再是「模型沒看過的題目」，
-    它的分數也就失去了「這是誠實數字」的意義。
+    否則日後看到報告上某欄位的 Recall 是「—」，
+    會分不清是「這份資料沒考到」還是「有人把它偷偷關掉了」。
     """
-    dev = {c["raw_requirement"] for c in _load("dataset.json")["cases"]}
-    holdout = {c["raw_requirement"] for c in _load("holdout.json")["cases"]}
+    for filename, exempt in COVERAGE_EXEMPT.items():
+        gaps = _load(filename)["meta"].get("known_coverage_gaps", [])
+        text = " ".join(gaps)
+        for name in exempt:
+            assert name in text, f"{filename} 豁免了 {name} 卻沒有記錄原因"
 
-    assert dev & holdout == set()
+
+def test_demo_data_does_not_reuse_evaluation_sentences():
+    """Demo 客戶的原話不能跟任何一份評估資料集重複。
+
+    重複的話，那些測試句子就會躺在 Demo 資料庫裡被反覆分析、被反覆看到答案，
+    「從沒被用來調整過任何東西」這個前提會慢慢失效 ——
+    尤其 final_test 是鎖到 Sprint 7 才開的期末考。
+
+    Demo 資料可以「參考」測試句子的風格，但不能重用句子本身。
+    """
+    from app.services.starter_data import STARTER_LEADS
+    from scripts.seed_demo import LEADS
+
+    # 兩邊都要守：demo 帳號那 32 筆，以及註冊時自動建立的範例客戶。
+    # 兩份資料分開寫（目的不同），但這條紀律是同一條。
+    written = {spec["raw"] for spec in LEADS} | {
+        spec["raw"] for spec in STARTER_LEADS
+    }
+    for name in DATASET_FILES:
+        overlap = written & {c["raw_requirement"] for c in _load(name)["cases"]}
+        assert overlap == set(), f"Demo／範例資料與 {name} 重複：{overlap}"
+
+
+def test_no_sentence_appears_in_two_datasets():
+    """三份資料集不能有重複的句子。
+
+    只要有一句重疊，holdout 與 final_test 就不再是「模型沒看過的題目」，
+    它們的分數也就失去了「這是誠實數字」的意義。
+    """
+    import itertools
+
+    sentences = {
+        name: {c["raw_requirement"] for c in _load(name)["cases"]}
+        for name in DATASET_FILES
+    }
+    for a, b in itertools.combinations(DATASET_FILES, 2):
+        assert sentences[a] & sentences[b] == set(), f"{a} 與 {b} 有重複句子"

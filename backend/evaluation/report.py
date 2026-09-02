@@ -23,6 +23,7 @@ FIELD_LABEL = {
     "parking": "車位 parking",
     "purpose": "購屋目的",
     "purchase_timeline": "購屋時程",
+    "urgency": "急迫程度",
 }
 
 OUTCOME_LABEL = {
@@ -53,6 +54,11 @@ DATASET_CAVEAT = {
         "✅ 這是**驗證集**，從未被用來修改 prompt。"
         "模型是在完全沒看過這些句子的情況下作答的，這裡的數字才可以對外引用。"
     ),
+    "final": (
+        "🔒 這是**期末考資料集**：由具房仲業務實務經驗、且未讀過 prompt 的人出題，"
+        "句子取材自真實業務場景。這份的數字是所有報告裡最接近真實表現的。"
+        "**不得因為這份的結果去修改 prompt。**"
+    ),
 }
 
 
@@ -80,11 +86,11 @@ def render_markdown(report: Report, *, dataset_name: str, dataset_version: str) 
     add("|---|---|---|")
     add(
         f"| 欄位正確率 | **{_pct(report.field_accuracy)}** "
-        f"| {len(report.cases)} 筆 × 10 個欄位攤平之後的整體正確率 |"
+        f"| {len(report.cases)} 筆 × {len(FIELDS)} 個欄位攤平之後的整體正確率 |"
     )
     add(
         f"| 完全正確率 | **{_pct(report.exact_match_rate)}** "
-        "| 10 個欄位全對的案例比例，最嚴格也最貼近使用者感受 |"
+        f"| {len(FIELDS)} 個欄位全對的案例比例，最嚴格也最貼近使用者感受 |"
     )
     add(
         f"| 捏造率 | **{_pct(report.hallucination_rate)}** "

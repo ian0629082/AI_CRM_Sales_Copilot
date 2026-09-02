@@ -1,9 +1,11 @@
 import { apiRequest } from "@/lib/api/client";
 import type {
+  FollowUpResponse,
   Lead,
   LeadAnalyzeResponse,
   LeadCreate,
   LeadDetail,
+  LeadFollowUpResponse,
   LeadListResponse,
   LeadStatus,
   LeadUpdate,
@@ -32,6 +34,16 @@ export function listLeads(params: LeadListParams = {}): Promise<LeadListResponse
   return apiRequest<LeadListResponse>(`/leads${buildQuery(params)}`);
 }
 
+/**
+ * 今天該聯絡誰。
+ *
+ * 回傳兩份分開的清單而不是一份排序好的名單 ——
+ * 「還沒有人聯絡過」跟「聯絡過但太久沒動」是兩種不同的業務動作。
+ */
+export function listFollowUps(): Promise<FollowUpResponse> {
+  return apiRequest<FollowUpResponse>("/leads/follow-ups");
+}
+
 export function getLead(id: number): Promise<LeadDetail> {
   return apiRequest<LeadDetail>(`/leads/${id}`);
 }
@@ -53,6 +65,19 @@ export function updateLead(id: number, payload: LeadUpdate): Promise<Lead> {
  */
 export function analyzeLead(id: number): Promise<LeadAnalyzeResponse> {
   return apiRequest<LeadAnalyzeResponse>(`/leads/${id}/analyze`, {
+    method: "POST",
+  });
+}
+
+/**
+ * 請 AI 給一則跟進建議：下一步動作、建議話術、建議時機。
+ *
+ * 跟 analyzeLead 最大的差別是**這支不會改動客戶的任何欄位**，
+ * 所以呼叫成功後不需要讓客戶資料的快取失效。
+ * 建議是給業務看的參考，不是關於這位客戶的新事實。
+ */
+export function suggestFollowUp(id: number): Promise<LeadFollowUpResponse> {
+  return apiRequest<LeadFollowUpResponse>(`/leads/${id}/follow-up-suggestion`, {
     method: "POST",
   });
 }

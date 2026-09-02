@@ -36,6 +36,22 @@ class LeadRepository:
         )
         return self.db.execute(stmt).scalar_one_or_none()
 
+    def list_for_follow_up(self, owner_id: int) -> list[Lead]:
+        """撈出所有還沒結案的客戶，連同互動一起載入。
+
+        用 selectinload 一次撈完 —— 判斷「有沒有被聯絡過」要看互動，
+        逐筆去查會變成 N+1，而資料庫在新加坡，每一次來回都是幾十毫秒。
+        """
+        stmt = (
+            select(Lead)
+            .where(
+                Lead.owner_id == owner_id,
+                Lead.status.notin_([LeadStatus.WON, LeadStatus.LOST]),
+            )
+            .options(selectinload(Lead.interactions))
+        )
+        return list(self.db.execute(stmt).scalars())
+
     def list(
         self,
         *,

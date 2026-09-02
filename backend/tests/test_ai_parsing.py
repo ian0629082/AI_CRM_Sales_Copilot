@@ -36,6 +36,7 @@ EMPTY_RESULT = {
     "parking": None,
     "purpose": None,
     "purchase_timeline": None,
+    "urgency": None,
 }
 
 
@@ -55,6 +56,7 @@ FULL_JSON = _json_with(
     parking=True,
     purpose="SELF_USE",
     purchase_timeline=3,
+    urgency="HIGH",
 )
 
 
@@ -124,6 +126,7 @@ def test_analyze_writes_parsed_fields_back_to_lead(ai_client, fake_llm):
     assert body["lead"]["property_type"] == "ELEVATOR_BUILDING"
     assert body["lead"]["building_age_max"] == 10
     assert body["lead"]["purchase_timeline"] == 3
+    assert body["lead"]["urgency"] == "HIGH"
 
     # 客戶原話是唯一事實來源，任何情況下都不該被解析結果覆蓋
     assert body["lead"]["raw_requirement"] == lead["raw_requirement"]
@@ -137,7 +140,7 @@ def test_analyze_records_metadata_for_later_evaluation(ai_client):
     # prompt_version 與 model 是 Sprint 4 拿來比較「換了之後有沒有比較準」的依據。
     # 這裡刻意寫死版號而不是引用 DEFAULT_PROMPT_VERSION：
     # 改了預設版本就該讓這個測試紅一次，逼人確認「這次改版有跑過評估嗎」。
-    assert analysis["prompt_version"] == "lead_analysis_v2"
+    assert analysis["prompt_version"] == "lead_analysis_v4"
     assert analysis["model"] == "fake-model"
     assert analysis["prompt_tokens"] == 100
     assert analysis["completion_tokens"] == 50
@@ -187,7 +190,7 @@ def test_detail_page_exposes_latest_analysis(ai_client):
     detail = ai_client.get(f"{PREFIX}/leads/{lead['id']}").json()
 
     # 前端靠這個決定要不要掛「AI 解析」徽章，重新整理後徽章才不會消失
-    assert detail["latest_analysis"]["prompt_version"] == "lead_analysis_v2"
+    assert detail["latest_analysis"]["prompt_version"] == "lead_analysis_v4"
 
 
 def test_latest_analysis_is_none_before_any_analysis(ai_client):
@@ -322,3 +325,90 @@ def test_cannot_analyze_someone_elses_lead(ai_client, other_client):
     lead = _create_lead(ai_client)
 
     assert other_client.post(f"{PREFIX}/leads/{lead['id']}/analyze").status_code == 404
+
+
+# ---------------------------------------------------------------- 原話快照快取
+#
+# 同一段原話重複解析，結果本來就會一樣 —— 那是純粹的浪費，而且是**花錢的**浪費。
+# 所以比對的是原話的內容，不是「按過幾次」：改了原話再按，仍然要真的重新解析。
+
+
+def test_same_raw_requirement_does_not_call_the_model_twice(ai_client, fake_llm):
+    lead = _create_lead(ai_client)
+
+    first = ai_client.post(f"{PREFIX}/leads/{lead['id']}/analyze").json()
+    second = ai_client.post(f"{PREFIX}/leads/{lead['id']}/analyze").json()
+
+    assert len(fake_llm.calls) == 1, "原話沒變，不應該再呼叫一次模型"
+    assert first["reused"] is False
+    assert second["reused"] is True
+    # 沿用的是同一筆分析紀錄，不是新增一筆內容相同的
+    assert second["analysis"]["id"] == first["analysis"]["id"]
+
+
+def test_editing_the_raw_requirement_triggers_a_real_reanalysis(ai_client, fake_llm):
+    """客戶需求變了，業務改了原話 —— 這是新的輸入，該重跑。"""
+    lead = _create_lead(ai_client)
+    ai_client.post(f"{PREFIX}/leads/{lead['id']}/analyze")
+
+    ai_client.patch(
+        f"{PREFIX}/leads/{lead['id']}",
+        json={"raw_requirement": "改成想找兩房，預算提高到 2500 萬"},
+    )
+    again = ai_client.post(f"{PREFIX}/leads/{lead['id']}/analyze").json()
+
+    assert len(fake_llm.calls) == 2
+    assert again["reused"] is False
+    assert fake_llm.calls[-1] != fake_llm.calls[0]
+
+
+def test_reused_analysis_does_not_overwrite_manual_corrections(ai_client, fake_llm):
+    """快取命中時不重新套用欄位。
+
+    AI 把房數抽錯、業務手動改對了，這時再按一次「AI 解析」，
+    不可以把他改對的東西蓋回 AI 原本的錯誤 ——
+    他按那顆按鈕並沒有要求系統做這件事。
+    """
+    fake_llm.content = _json_with(rooms=3)
+    lead = _create_lead(ai_client)
+    ai_client.post(f"{PREFIX}/leads/{lead['id']}/analyze")
+
+    ai_client.patch(f"{PREFIX}/leads/{lead['id']}", json={"rooms": 2})
+    again = ai_client.post(f"{PREFIX}/leads/{lead['id']}/analyze").json()
+
+    assert again["reused"] is True
+    assert again["lead"]["rooms"] == 2
+
+
+def test_failed_analysis_is_not_cached(ai_client, fake_llm):
+    """AI 掛掉時不會留下分析紀錄，所以重試永遠打得出去。
+
+    這一條是快取最重要的邊界：如果連失敗都被記住，
+    業務就會卡在一個「重試按鈕按了沒反應」的狀態。
+    """
+    fake_llm.error = LLMError("模型暫時無法使用")
+    lead = _create_lead(ai_client)
+
+    assert ai_client.post(f"{PREFIX}/leads/{lead['id']}/analyze").status_code == 503
+
+    fake_llm.error = None
+    retried = ai_client.post(f"{PREFIX}/leads/{lead['id']}/analyze").json()
+
+    assert retried["reused"] is False
+    assert len(fake_llm.calls) == 2
+
+
+def test_cache_is_per_lead(ai_client, fake_llm):
+    """兩位客戶剛好講了一模一樣的話，也要各自解析。
+
+    快取的鍵是「這位客戶的上一次解析」，不是全域的原話對照表 ——
+    後者會讓一筆客戶的分析紀錄掛到另一筆身上。
+    """
+    first = _create_lead(ai_client, name="王先生")
+    second = _create_lead(ai_client, name="李小姐")
+
+    ai_client.post(f"{PREFIX}/leads/{first['id']}/analyze")
+    other = ai_client.post(f"{PREFIX}/leads/{second['id']}/analyze").json()
+
+    assert other["reused"] is False
+    assert len(fake_llm.calls) == 2

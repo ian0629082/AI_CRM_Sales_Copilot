@@ -1,0 +1,53 @@
+# 每天把 Demo 資料重置成乾淨的樣子。
+#
+# 為什麼需要：登入頁有「直接看 Demo」，任何人都能改那 32 筆客戶 ——
+# 改壞了不會有人通知你，而下一個點開作品的人看到的就是那個樣子。
+#
+# 為什麼不是用 Render 的排程：免費方案不能跑 one-off job。
+# 所以這裡直接從 GitHub Actions 連 Neon，跟後端服務無關 ——
+# 附帶的好處是後端在休眠也不影響重置。
+
+name: 重置 Demo 資料
+
+on:
+  schedule:
+    # UTC 20:00 = 台北時間清晨 04:00。挑這個時間是因為它同時滿足兩件事：
+    # 台灣沒有人在用，而歐美的白天也已經過去了。
+    #
+    # GitHub 的排程不保證準時（尖峰時可能延遲數十分鐘），
+    # 這對「每天回到乾淨狀態」這個需求無所謂 —— 但要知道有這回事，
+    # 不要看到 04:30 才跑就以為壞了。
+    - cron: "0 20 * * *"
+  # 手動也能觸發：Demo 前想確認資料是乾淨的，不必等到隔天。
+  workflow_dispatch:
+
+jobs:
+  reset:
+    name: 重建 32 筆虛構客戶
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # 這支腳本不驗證 token，但 Settings 在啟動時就會檢查密鑰長度，
+      # 所以還是要給一個夠長的值。這裡不需要真的密鑰。
+      JWT_SECRET: "reset-demo-job-placeholder-not-a-real-secret"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: 安裝依賴
+        run: pip install -r requirements.txt
+
+      - name: 重置
+        # --reset 只刪 raw_requirement 以 [demo] 開頭的資料，
+        # 不會動到任何人自己建的客戶。
+        run: python -m scripts.seed_demo --reset

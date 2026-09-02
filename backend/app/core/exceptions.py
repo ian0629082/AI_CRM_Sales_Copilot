@@ -43,6 +43,21 @@ class ValidationError(AppError):
     message = "資料不符合要求"
 
 
+class RateLimitError(AppError):
+    """超過使用次數上限。
+
+    429 而不是 403：403 是「你沒有權限做這件事」，
+    429 是「你有權限，只是現在太多了，等一下就可以」——
+    前端要據此決定顯示「請聯絡管理員」還是「明天再試」。
+
+    訊息要講清楚上限是多少、什麼時候恢復。只說「已達上限」的話，
+    使用者不知道該等一分鐘還是等到明天，那種不確定比限制本身更難受。
+    """
+
+    status_code = 429
+    message = "已達使用上限，請稍後再試"
+
+
 class AIServiceError(AppError):
     """AI 分析失敗。
 

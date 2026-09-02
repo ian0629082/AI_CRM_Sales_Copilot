@@ -14,14 +14,19 @@ strict 模式傳不了 minimum / maximum 這類數值約束，所以這第二道
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.models.enums import PropertyType, Purpose
+from app.models.enums import PropertyType, Purpose, Urgency
 
 # 住宅預算的合理上限（10 億台幣）。
 # 這道防線是在擋模型偶爾多打幾個零 —— 「2000 萬」寫成 200 億這種錯誤，
 # 格式上完全合法，只有數值範圍檢查抓得到。
 MAX_BUDGET = 1_000_000_000
+
+# 跟進建議最多引用幾條客戶說過的話。
+# 上限存在的理由是可讀性（畫面上列十條沒有人會看），不是正確性 ——
+# 所以超過時截斷，不是把整則建議退回。
+MAX_EVIDENCE = 5
 
 
 class ParsedRequirement(BaseModel):
@@ -50,6 +55,9 @@ class ParsedRequirement(BaseModel):
     purchase_timeline: int | None = Field(
         default=None, ge=0, le=120, description="預計幾個月內購買"
     )
+    urgency: Urgency | None = Field(
+        default=None, description="客戶表達出的急迫程度，沒表達就是 None"
+    )
 
     @model_validator(mode="after")
     def check_budget_range(self):
@@ -72,6 +80,101 @@ class ParsedRequirement(BaseModel):
         if self.budget_is_approximate and self.budget_max is None and self.budget_min is None:
             raise ValueError("沒有預算數字時，budget_is_approximate 不應為 true")
         return self
+
+
+class FollowUpSuggestion(BaseModel):
+    """AI 產生的跟進建議。
+
+    這是專案第一個「AI 生成自由文字」的功能，跟 ParsedRequirement 有根本差異：
+    需求解析有標準答案（客戶說了 2000 萬，答案就是 20000000），
+    跟進建議沒有 —— 同一位客戶有十種合理的跟法。
+
+    所以這裡不追求「答對」，而是把輸出切成三段，讓每一段都能被單獨檢查：
+
+        next_action      下一步動作     業務看得懂、做得到嗎
+        talking_point    建議話術       這是最花時間、最值得自動化的一段
+        suggested_timing 建議時機       跟客戶說過的話對得上嗎
+
+    切成三段而不是一整段自由文字，是為了讓評估有著力點 ——
+    一整段話只能整體給個「好/不好」，切開之後每一段各有各的判準。
+
+    ### evidence 這一欄是整個設計的重點
+
+    要求模型把「話術裡引用到的客戶資訊」逐字摘出來。
+    這一欄不是給業務看的，是給**評估**用的：
+    引用的句子必須逐字出現在輸入裡，這是「有沒有捏造」的可程式驗證版本。
+
+    沒有它的話，「AI 有沒有編造客戶沒說過的事」只能靠人一句一句讀，
+    或再叫另一個 LLM 判斷 —— 前者不可規模化，後者本身也會出錯。
+    """
+
+    next_action: str = Field(
+        min_length=1, max_length=60, description="下一步該做什麼，一句話"
+    )
+    talking_point: str = Field(
+        min_length=1, max_length=300, description="建議的開場話術，可直接複製使用"
+    )
+    suggested_timing: str = Field(
+        min_length=1, max_length=40, description="建議什麼時候聯絡"
+    )
+    # 沒有預設值，也就是必填。
+    # 給了 default 的話，OpenAPI 上這一欄會變成選填，前端生成的型別
+    # 就是 string[] | undefined，每次使用都得先判斷一次 —— 但實際上
+    # strict schema 保證模型一定會回這個欄位，沒引用任何東西時是空陣列。
+    # 「沒有引用」與「沒有這個欄位」是兩件事，型別上也該分得開。
+    evidence: list[str] = Field(
+        max_length=MAX_EVIDENCE,
+        description="話術引用到的客戶資訊，逐字取自客戶原話或互動紀錄；沒有引用就是空陣列",
+    )
+
+    @field_validator("evidence", mode="before")
+    @classmethod
+    def truncate_evidence(cls, value):
+        """超過上限就截斷，不要讓整則建議作廢。
+
+        第一次真的連上模型，12 筆裡就有一筆回了 6 條引用而被擋下來 ——
+        prompt 明明寫了「最多 5 條」，模型還是多給了一條。
+
+        但「多引用一條」根本不是品質問題，業務不會因此少做什麼。
+        用整則作廢去處理一個排版偏好，是明顯不成比例的：
+        使用者看到的是 503，而真正的原因只是模型多列了一項。
+
+        驗證該擋的是**會造成傷害**的東西（空白的建議、負數的預算），
+        不是「跟我想的格式差一點」。這條界線劃錯的代價，
+        是功能在完全正常的情況下也三不五時失敗。
+        """
+        if isinstance(value, list) and len(value) > MAX_EVIDENCE:
+            return value[:MAX_EVIDENCE]
+        return value
+
+
+class FollowUpAnalysisRead(BaseModel):
+    """一次跟進建議的紀錄。
+
+    與 AIAnalysisRead 共用同一張表，但 parsed_result 的型別不同 ——
+    所以分成兩個 schema，而不是把型別放寬成 dict。
+    放寬的代價是前端生成出來的型別會變成 Record<string, never>，等於什麼都拿不到。
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    analysis_type: str
+    # 結構化的三段建議。存的是「當時輸出的快照」，不是拿來查詢的資料。
+    parsed_result: FollowUpSuggestion | None
+    # 組合好的純文字版本。日後 n8n（Sprint 8）要把建議寄到業務信箱時，
+    # 直接取這一欄就好，不必在那邊再拼一次字串。
+    suggestion: str | None
+    # 產生建議當下的分數與等級。
+    # 分數會隨著業務補資料而變動，存快照才知道「這則建議是在幾分的狀態下給的」。
+    score_snapshot: int | None
+    level_snapshot: str | None
+    prompt_version: str
+    model: str
+    prompt_tokens: int | None
+    completion_tokens: int | None
+    latency_ms: int | None
+    created_at: datetime
 
 
 class AIAnalysisRead(BaseModel):
