@@ -125,6 +125,27 @@ Render → Environment → `CORS_ORIGINS` 改成 `https://<你的專案>.vercel.
 
 ---
 
+## 四之二、每天重置 Demo 資料
+
+登入頁有「直接看 Demo」，所以任何人都能改那 32 筆客戶。
+改壞了不會有人通知你，而下一個點開作品的人看到的就是那個樣子。
+
+排程在 [.github/workflows/reset-demo.yml](../.github/workflows/reset-demo.yml)，
+每天台北時間清晨 04:00 跑一次，也可以在 GitHub 的 Actions 頁手動觸發。
+
+**要先加一個 secret**：GitHub → Settings → Secrets and variables → Actions →
+New repository secret，名稱 `DATABASE_URL`，值就是 Neon 那串
+（同樣要 `postgresql+psycopg://` 開頭）。沒加的話這個 workflow 每天都會失敗。
+
+> 它直接連 Neon，不經過 Render —— 免費方案不能跑 one-off job，
+> 而且這樣後端在休眠也不影響重置。
+
+**一個副作用要知道**：重置會連帶刪掉那些客戶的 `ai_analysis` 紀錄，
+而每日的 AI 建議額度就是用那張表算的，所以額度會在重置時一併歸零。
+清晨四點沒有人在用，影響可以忽略，但別在看到「用完了卻又能按」時感到困惑。
+
+---
+
 ## 五、合併回 main 之後一定要做的事
 
 部署期間 Render 與 Vercel 都綁在 `feature/deployment` 上。
