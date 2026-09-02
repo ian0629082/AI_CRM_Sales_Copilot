@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
+import { RequestIdHint } from "@/components/request-id-hint";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -483,6 +484,7 @@ export default function LeadDetailPage() {
                   <Button size="sm" variant="outline" onClick={handleSuggestFollowUp}>
                     重試
                   </Button>
+                  <RequestIdHint error={suggestFollowUp.error} />
                 </div>
               ) : null}
 
@@ -611,6 +613,7 @@ export default function LeadDetailPage() {
                   <Button size="sm" variant="outline" onClick={handleAnalyze}>
                     重試
                   </Button>
+                  <RequestIdHint error={analyzeLead.error} />
                 </div>
               ) : null}
 
