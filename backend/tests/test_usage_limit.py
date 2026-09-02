@@ -36,12 +36,16 @@ from tests.test_follow_up_advice import (  # noqa: F401  fixture 一起帶進來
 
 @pytest.fixture
 def limit_of_two(monkeypatch: pytest.MonkeyPatch) -> int:
-    """把上限調成 2，測試才不必按十次。
+    """把個人上限調成 2，測試才不必按十次。
 
     上限本身是設定值不是常數，正是為了這種可調整性 ——
     Demo 期間想放寬也不必改程式碼。
+
+    全站上限順便調高，否則測個人上限時會先撞到全站的那一道，
+    通過的原因就不是我們要驗的那個了。
     """
     monkeypatch.setattr(settings, "FOLLOW_UP_DAILY_LIMIT", 2)
+    monkeypatch.setattr(settings, "FOLLOW_UP_GLOBAL_DAILY_LIMIT", 999)
     return 2
 
 
@@ -124,6 +128,70 @@ def test_yesterday_does_not_count(
     db_session.commit()
 
     assert _suggest(advice_client, lead["id"]).status_code == 200
+
+
+# ---------------------------------------------------------------- 全站總量
+
+
+@pytest.fixture
+def global_limit_of_three(monkeypatch: pytest.MonkeyPatch) -> int:
+    """全站上限調成 3，個人上限調高，這樣擋下來的一定是全站那一道。"""
+    monkeypatch.setattr(settings, "FOLLOW_UP_DAILY_LIMIT", 999)
+    monkeypatch.setattr(settings, "FOLLOW_UP_GLOBAL_DAILY_LIMIT", 3)
+    return 3
+
+
+def test_global_limit_counts_everyone(
+    advice_client, other_client: TestClient, global_limit_of_three
+):
+    """全站總量把所有人加在一起算。
+
+    個人上限擋不住「很多人各用一點」—— 註冊是開放的，
+    而每一次呼叫都記在同一個人的 OpenAI 帳單上。
+    """
+    my_lead = _create_lead(advice_client)
+    其他人的客戶 = _create_lead(other_client)
+
+    # 兩個人合起來用掉 3 次，剛好是全站上限
+    assert _suggest(advice_client, my_lead["id"]).status_code == 200
+    assert _suggest(other_client, 其他人的客戶["id"]).status_code == 200
+    assert _suggest(advice_client, my_lead["id"]).status_code == 200
+
+    # 第四次不管誰按都會被擋
+    assert _suggest(other_client, 其他人的客戶["id"]).status_code == 429
+    assert _suggest(advice_client, my_lead["id"]).status_code == 429
+
+
+def test_global_limit_message_does_not_mention_other_users(
+    advice_client, global_limit_of_three
+):
+    """訊息不要跟使用者解釋「別人把額度用光了」。
+
+    那是他無法理解也無法影響的事，講了只會讓他覺得這個系統莫名其妙。
+    真正的原因記在 log 裡給維護的人看就好。
+    """
+    lead = _create_lead(advice_client)
+    for _ in range(global_limit_of_three):
+        _suggest(advice_client, lead["id"])
+
+    detail = _suggest(advice_client, lead["id"]).json()["detail"]
+    assert "明天" in detail
+    for word in ("全站", "其他人", "別人"):
+        assert word not in detail
+
+
+def test_global_limit_does_not_call_the_model(
+    advice_client, fake_llm: FakeLLMProvider, global_limit_of_three
+):
+    """跟個人上限一樣：擋在花錢之後等於沒擋。"""
+    lead = _create_lead(advice_client)
+    for _ in range(global_limit_of_three):
+        _suggest(advice_client, lead["id"])
+
+    calls_before = len(fake_llm.calls)
+    _suggest(advice_client, lead["id"])
+
+    assert len(fake_llm.calls) == calls_before
 
 
 # ---------------------------------------------------------------- 日界線

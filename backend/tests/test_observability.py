@@ -21,7 +21,6 @@ from app.core.middleware import (
     REQUEST_ID_HEADER,
     claimed_client_ip,
     forwarded_chain,
-    trusted_client_ip,
 )
 from app.main import app
 from tests.conftest import PREFIX
@@ -195,39 +194,21 @@ def test_claimed_ip_is_what_the_caller_wrote():
     assert claimed_client_ip(req) == "1.2.3.4"
 
 
-def test_trusted_ip_takes_the_last_hop():
-    """最後一段是我們前面那一層代理寫的，是這串裡唯一不受外部控制的值。
-
-    這正是節流要用的那個 —— 攻擊者可以在前面塞任意多個假 IP，
-    但改不掉代理自己附加的那一段。
-    """
-    req = _request_with({"X-Forwarded-For": "1.2.3.4, 61.223.40.235"}, ("10.0.0.1", 80))
-    assert trusted_client_ip(req) == "61.223.40.235"
-
-
-def test_trusted_ip_ignores_a_long_forged_chain():
-    """攻擊者塞一整串假的也沒用，取的仍然是最後那一段。"""
-    forged = "1.1.1.1, 2.2.2.2, 3.3.3.3, 61.223.40.235"
-    req = _request_with({"X-Forwarded-For": forged}, ("10.0.0.1", 80))
-    assert trusted_client_ip(req) == "61.223.40.235"
-
-
 def test_client_ip_falls_back_to_direct_connection():
     """本機開發或直連時沒有這個 header，退回 TCP 對端位址。"""
-    assert trusted_client_ip(_request_with({}, ("127.0.0.1", 5000))) == "127.0.0.1"
     assert claimed_client_ip(_request_with({}, ("127.0.0.1", 5000))) == "127.0.0.1"
 
 
 def test_client_ip_handles_missing_client():
-    assert trusted_client_ip(_request_with({}, None)) == "-"
+    assert claimed_client_ip(_request_with({}, None)) == "-"
 
 
 def test_forwarded_chain_counts_hops():
-    """hops 是驗證「取最後一段」還對不對的依據。
+    """hops 讓「對方自己也塞了一段」看得出來。
 
-    正式環境每個請求都應該固定是 1。哪天平台在前面多加一層，
-    這個數字會變成 2 —— 那時候取到的就不再是客戶端，
-    而症狀會是「節流突然把所有人一起鎖住」，沒有這個數字幾乎查不出來。
+    實測 Render 固定附加 3 段，所以正常請求是 3、看到 4 就是對方自己加的。
+    那不一定是攻擊，但它是「這個 ip 更不可信」的訊號，
+    而只看 ip 那一欄完全看不出來。
     """
     assert forwarded_chain(_request_with({"X-Forwarded-For": "1.1.1.1"}, None)) == [
         "1.1.1.1"

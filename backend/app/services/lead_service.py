@@ -296,19 +296,41 @@ class LeadService:
         #
         # 順序是刻意的：查不到的客戶要回 404（回 429 等於承認那筆資料存在），
         # 而額度必須在花錢之前擋下來 —— 檢查放在模型呼叫之後就毫無意義了。
+        day_start = local_day_start_utc()
+
         used = self.analysis_repo.count_since(
-            self.current_user.id, FOLLOW_UP, local_day_start_utc()
+            self.current_user.id, FOLLOW_UP, day_start
         )
         limit = settings.FOLLOW_UP_DAILY_LIMIT
         if used >= limit:
             logger.info(
-                "使用者 %s today 已用 %s 次跟進建議，達到上限 %s",
+                "使用者 %s 今天已用 %s 次跟進建議，達到個人上限 %s",
                 self.current_user.id,
                 used,
                 limit,
             )
             raise RateLimitError(
                 f"今天的 AI 跟進建議已經用完 {limit} 次，明天零點會重新計算。"
+                "已經產生過的建議仍然看得到。"
+            )
+
+        # 全站總量。個人上限擋不住「很多人各用一點」——
+        # 註冊是開放的，而每一次呼叫都記在同一個人的 OpenAI 帳單上。
+        #
+        # 訊息刻意不說「全站」用完了：對使用者而言那是他無法理解也無法
+        # 影響的事，講了只會讓他覺得這個系統莫名其妙。說「今天的額度用完
+        # 了，明天再試」就夠了，真正的原因記在 log 裡給維護的人看。
+        global_used = self.analysis_repo.count_all_since(FOLLOW_UP, day_start)
+        global_limit = settings.FOLLOW_UP_GLOBAL_DAILY_LIMIT
+        if global_used >= global_limit:
+            logger.warning(
+                "全站今天已用 %s 次跟進建議，達到總量上限 %s（使用者 %s 被擋下）",
+                global_used,
+                global_limit,
+                self.current_user.id,
+            )
+            raise RateLimitError(
+                "今天的 AI 跟進建議額度已經用完了，明天零點會重新計算。"
                 "已經產生過的建議仍然看得到。"
             )
 

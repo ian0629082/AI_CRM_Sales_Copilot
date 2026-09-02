@@ -52,6 +52,22 @@ class AIAnalysisRepository:
         )
         return total or 0
 
+    def count_all_since(self, analysis_type: str, since: datetime) -> int:
+        """全站從 `since` 之後總共用掉幾次某類分析。
+
+        跟 count_since 的差別只有「不看是誰用的」。
+        個人上限擋不住「很多人各用一點」，而帳單不管是誰按的。
+        """
+        total = (
+            self.db.query(func.count(AIAnalysis.id))
+            .filter(
+                AIAnalysis.analysis_type == analysis_type,
+                AIAnalysis.created_at >= since,
+            )
+            .scalar()
+        )
+        return total or 0
+
     def get_latest(self, lead_id: int, analysis_type: str) -> AIAnalysis | None:
         """這位客戶最近一次的某類分析。
 

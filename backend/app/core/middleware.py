@@ -30,40 +30,23 @@ def forwarded_chain(request: Request) -> list[str]:
 def claimed_client_ip(request: Request) -> str:
     """客戶端**宣稱**的來源 IP（X-Forwarded-For 的第一段）。
 
-    這個值是送請求的人自己填的，實測過 Render 不會覆蓋它 ——
-    偽造 `X-Forwarded-For: 1.2.3.4` 之後，log 裡就是 1.2.3.4。
+    名字裡的 claimed 是刻意的：這個值是送請求的人自己填的。
+    在 Render 上實測過 —— 偽造 `X-Forwarded-For: 1.2.3.4` 之後，
+    log 裡就是 1.2.3.4，平台不會覆蓋它。
 
-    所以它只能用來查問題與看趨勢，**不能當作封鎖或計數的依據**。
-    用一個攻擊者控制得了的值當節流的鍵，跟沒有節流沒兩樣，
-    差別只在你以為有 —— 他每送一次請求換一個假 IP，計數器永遠不會累積。
+    所以它只能拿來查問題與看趨勢，**不能當作封鎖或計數的依據**。
+
+    那「往後數」呢？也不行。同一次實測顯示最後一段是 Render 的內部位址
+    （10.x），而且兩次請求拿到不同的機器 —— 內部有多台代理輪替。
+    拿它當鍵的話，同一個來源每次拿到不同的鍵，計數永遠累積不到上限；
+    真要用得往回數固定的層數，而那個層數是平台的內部結構決定的，
+    它改一次架構就失效，失效的樣子還是「防護還在，只是不擋任何東西」。
+
+    正式環境沒有這個 header 時（本機開發、直連）退回 TCP 的對端位址。
     """
     chain = forwarded_chain(request)
     if chain:
         return chain[0]
-    return request.client.host if request.client else "-"
-
-
-def trusted_client_ip(request: Request) -> str:
-    """可以拿來計數的來源 IP：X-Forwarded-For 的**最後一段**。
-
-    這串的規則是「每經過一層代理就往後面附加一個」，所以：
-
-        X-Forwarded-For: 1.2.3.4, 61.223.40.235
-                         ↑客戶端自己寫的  ↑Render 附加的
-
-    客戶端能決定的只有前面那些，最後一段是我們前面那一層代理寫的 ——
-    它是這串裡唯一不受外部控制的值。
-
-    這個寫法**只在「前面剛好一層可信代理」時正確**。
-    多一層或少一層都會取到錯的東西：少一層會拿到客戶端偽造的值，
-    多一層會拿到內層代理的 IP（那樣所有人的 IP 都一樣，一鎖就鎖全部）。
-    所以這件事不能靠猜，要在實際環境上驗證過 —— 驗證方式見下面那行 log。
-
-    沒有這個 header 時（本機開發、直連）退回 TCP 的對端位址。
-    """
-    chain = forwarded_chain(request)
-    if chain:
-        return chain[-1]
     return request.client.host if request.client else "-"
 
 
@@ -122,7 +105,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         incoming = request.headers.get(REQUEST_ID_HEADER, "")
         request_id = incoming[:64] if incoming else new_request_id()
 
-        set_request_context(request_id, trusted_client_ip(request))
+        set_request_context(request_id, claimed_client_ip(request))
         request.state.request_id = request_id
 
         started = time.perf_counter()
@@ -142,22 +125,20 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         elapsed_ms = (time.perf_counter() - started) * 1000
         response.headers[REQUEST_ID_HEADER] = request_id
 
-        # ip 是拿來計數的那個（最後一段），hops 是這串總共有幾段。
+        # 欄位名寫 ip_claimed 而不是 ip：提醒讀 log 的人這個值是對方自己填的。
         #
-        # hops 看起來是多餘的，但它是驗證「取最後一段對不對」的唯一依據：
-        # 正式環境的每個請求都應該固定是 1（Render 那一層）。
-        # 哪天平台在前面多加一層，hops 會變成 2，而那時候 ip 取到的
-        # 就不再是客戶端 —— 沒有這個數字的話，症狀會是
-        # 「節流突然把所有人一起鎖住」，而且完全看不出原因。
-        trusted = trusted_client_ip(request)
+        # hops 是 X-Forwarded-For 有幾段。實測 Render 固定附加 3 段，
+        # 所以正常請求是 3；看到 4 就代表對方自己也塞了一段進來 ——
+        # 那不一定是攻擊（有些代理本來就會加），但它是「這個 ip 更不可信」
+        # 的訊號，而只看 ip 那一欄是看不出來的。
         hops = len(forwarded_chain(request))
         logger.info(
-            "%s %s → %s (%.0f ms) ip=%s hops=%s",
+            "%s %s → %s (%.0f ms) ip_claimed=%s hops=%s",
             request.method,
             request.url.path,
             response.status_code,
             elapsed_ms,
-            trusted,
+            claimed_client_ip(request),
             hops,
         )
         return response
