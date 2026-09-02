@@ -59,6 +59,23 @@ class Settings(BaseSettings):
     # 同步等待的 API 一定要設逾時，否則 OpenAI 卡住時會把後端的連線一起卡死。
     OPENAI_TIMEOUT_SECONDS: float = 30.0
 
+    # --- 使用量上限（Sprint 7）---
+    #
+    # 跟進建議每人每天的次數。10 是依房仲實務給的數字：
+    # 一天真正讓業務猶豫「要打嗎、打了要講什麼」的客戶大約就這麼多。
+    #
+    # 這個上限防的不是攻擊，是「按著玩」與「按了沒反應就一直按」——
+    # 每一次都是真的付錢給 OpenAI。
+    #
+    # 寫成設定值而不是常數：Demo 期間可能想調鬆，不必改程式碼。
+    FOLLOW_UP_DAILY_LIMIT: int = 10
+
+    # 日界線用台北時間算，不用 UTC。
+    # 伺服器跑在 UTC，若照 UTC 算，額度會在台灣時間早上八點重置 ——
+    # 業務早上進辦公室按了幾次，額度就莫名其妙跳掉了。
+    # 「每天」對使用者而言是他當地的每天。
+    LOCAL_TIMEZONE: str = "Asia/Taipei"
+
     @field_validator("JWT_SECRET")
     @classmethod
     def jwt_secret_must_be_strong(cls, v: str) -> str:

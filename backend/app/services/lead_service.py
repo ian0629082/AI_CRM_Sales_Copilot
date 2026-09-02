@@ -12,7 +12,14 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
-from app.core.exceptions import AIServiceError, NotFoundError, ValidationError
+from app.core.clock import local_day_start_utc
+from app.core.config import settings
+from app.core.exceptions import (
+    AIServiceError,
+    NotFoundError,
+    RateLimitError,
+    ValidationError,
+)
 from app.models.ai_analysis import FOLLOW_UP, REQUIREMENT_PARSING, AIAnalysis
 from app.models.enums import LeadStatus
 from app.models.lead import Lead
@@ -283,6 +290,26 @@ class LeadService:
             # 硬要產生的話，模型只能靠猜 —— 而猜出來的東西正是我們最不想要的。
             raise ValidationError(
                 "這位客戶還沒有原始需求，也沒有任何互動紀錄，無法產生跟進建議"
+            )
+
+        # 額度檢查排在權限與資料檢查之後、呼叫模型之前。
+        #
+        # 順序是刻意的：查不到的客戶要回 404（回 429 等於承認那筆資料存在），
+        # 而額度必須在花錢之前擋下來 —— 檢查放在模型呼叫之後就毫無意義了。
+        used = self.analysis_repo.count_since(
+            self.current_user.id, FOLLOW_UP, local_day_start_utc()
+        )
+        limit = settings.FOLLOW_UP_DAILY_LIMIT
+        if used >= limit:
+            logger.info(
+                "使用者 %s today 已用 %s 次跟進建議，達到上限 %s",
+                self.current_user.id,
+                used,
+                limit,
+            )
+            raise RateLimitError(
+                f"今天的 AI 跟進建議已經用完 {limit} 次，明天零點會重新計算。"
+                "已經產生過的建議仍然看得到。"
             )
 
         today = today or date.today()
