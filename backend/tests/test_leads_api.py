@@ -12,7 +12,9 @@ PREFIX = "/api/v1"
 def test_health(client: TestClient):
     resp = client.get("/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+    # 回應裡還有一個 build 區塊（線上跑的是哪個分支／commit），
+    # 那一段由 test_build_info.py 負責驗，這裡只確認健康檢查本身還在。
+    assert resp.json()["status"] == "ok"
 
 
 def test_create_lead_minimal(client: TestClient):

@@ -11,6 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api import auth, interactions, leads
+from app.core.build_info import current_build
 from app.core.config import settings
 from app.core.exceptions import AppError
 from app.core.logging import setup_logging
@@ -84,4 +85,13 @@ app.include_router(interactions.router, prefix=settings.API_V1_PREFIX)
 
 @app.get("/health", tags=["system"])
 def health_check():
-    return {"status": "ok"}
+    """健康檢查，順便報出線上跑的是哪一版。
+
+    這支刻意不碰資料庫也不碰 OpenAI —— 它回 200 只代表「程式起來了」，
+    平台用它判斷服務死活，所以它必須快、而且不能被外部服務拖垮。
+
+    build 那一段是給人看的：部署平台跟著哪個分支，只有登入平台的人
+    看得到，而「以為它跟著 main」跟「其實跟著別的分支」在外面長得
+    一模一樣。讓服務自己說，就不必再去問平台。
+    """
+    return {"status": "ok", "build": current_build().model_dump()}
